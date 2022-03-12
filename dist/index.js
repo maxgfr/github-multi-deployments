@@ -31,7 +31,7 @@ function collectDeploymentContext() {
         coreArgs: {
             logsURL: `https://github.com/${owner}/${repo}/commit/${sha}/checks`,
             description: (0, core_1.getInput)('description'),
-            logArgs: (0, core_1.getInput)('log_args') === 'true'
+            isDebug: (0, core_1.getInput)('debug') === 'true'
         }
     };
 }
@@ -164,12 +164,12 @@ function run(step, context) {
                 case Step.Start:
                     {
                         const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: true }), override: (0, core_1.getInput)('override'), gitRef: (0, core_1.getInput)('ref') || context.ref });
-                        if (args.logArgs) {
+                        if (args.isDebug) {
                             console.log(`'${step}' arguments`, args);
                         }
                         let environments;
                         const isMulti = args.environment.split(',').length > 1;
-                        if (args.logArgs) {
+                        if (args.isDebug) {
                             console.log(`Is a multi environment : ${isMulti}`);
                         }
                         if (isMulti) {
@@ -178,7 +178,7 @@ function run(step, context) {
                         else {
                             environments = [args.environment];
                         }
-                        if (args.logArgs) {
+                        if (args.isDebug) {
                             console.log(`Environment(s) : ${environments}`);
                         }
                         const promises = [];
@@ -204,7 +204,7 @@ function run(step, context) {
                         catch (_a) {
                             (0, core_1.error)('Cannot generate deployments');
                         }
-                        if (args.logArgs) {
+                        if (args.isDebug) {
                             console.log('Deployments data');
                             console.log(deploymentsData);
                         }
@@ -236,13 +236,13 @@ function run(step, context) {
                 case Step.Finish:
                     {
                         const args = Object.assign(Object.assign({}, context.coreArgs), { status: (0, core_1.getInput)('status', { required: true }).toLowerCase(), deployment: (0, core_1.getInput)('deployment_id', { required: true }), envURL: (0, core_1.getInput)('env_url', { required: false }) });
-                        if (args.logArgs) {
+                        if (args.isDebug) {
                             console.log(`'${step}' arguments`, args);
                         }
                         let environmentsUrl;
                         if (args.envURL) {
                             const isMulti = args.envURL.split(',').length > 1;
-                            if (args.logArgs) {
+                            if (args.isDebug) {
                                 console.log(`Is a multi environment : ${isMulti}`);
                             }
                             if (isMulti) {
@@ -263,7 +263,7 @@ function run(step, context) {
                             (0, core_1.error)(`unexpected status ${args.status}`);
                             return;
                         }
-                        if (args.logArgs) {
+                        if (args.isDebug) {
                             console.log(`finishing deployment for ${args.deployment} with status ${args.status}`);
                         }
                         const newStatus = args.status === 'cancelled' ? 'inactive' : args.status;
@@ -302,7 +302,7 @@ function run(step, context) {
                 case Step.DeactivateEnv:
                     {
                         const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: false }) });
-                        if (args.logArgs) {
+                        if (args.isDebug) {
                             console.log(`'${step}' arguments`, args);
                         }
                         let environments;
@@ -329,7 +329,7 @@ function run(step, context) {
                 case Step.DeleteEnv:
                     {
                         const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: false }) });
-                        if (args.logArgs) {
+                        if (args.isDebug) {
                             console.log(`'${step}' arguments`, args);
                         }
                         let environments;

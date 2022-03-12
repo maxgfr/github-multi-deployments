@@ -11,7 +11,7 @@ export interface DeploymentContext {
   coreArgs: {
     logsURL: string
     description?: string
-    logArgs: boolean
+    isDebug: boolean
   }
 }
 
@@ -41,7 +41,7 @@ export function collectDeploymentContext(): DeploymentContext {
     coreArgs: {
       logsURL: `https://github.com/${owner}/${repo}/commit/${sha}/checks`,
       description: getInput('description'),
-      logArgs: getInput('log_args') === 'true'
+      isDebug: getInput('debug') === 'true'
     }
   }
 }

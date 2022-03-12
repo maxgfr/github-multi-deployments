@@ -36,6 +36,6 @@ inputs:
   status:
     required: false
     description: The deployment status. (For `finish` only)
-  log_args:
+  debug:
     required: false
     description: Print arguments used by this action.

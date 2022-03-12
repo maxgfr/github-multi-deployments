@@ -26,7 +26,7 @@ export async function run(
             gitRef: getInput('ref') || context.ref
           }
 
-          if (args.logArgs) {
+          if (args.isDebug) {
             console.log(`'${step}' arguments`, args)
           }
 
@@ -34,7 +34,7 @@ export async function run(
 
           const isMulti = args.environment.split(',').length > 1
 
-          if (args.logArgs) {
+          if (args.isDebug) {
             console.log(`Is a multi environment : ${isMulti}`)
           }
 
@@ -44,7 +44,7 @@ export async function run(
             environments = [args.environment]
           }
 
-          if (args.logArgs) {
+          if (args.isDebug) {
             console.log(`Environment(s) : ${environments}`)
           }
 
@@ -75,7 +75,7 @@ export async function run(
             error('Cannot generate deployments')
           }
 
-          if (args.logArgs) {
+          if (args.isDebug) {
             console.log('Deployments data')
             console.log(deploymentsData)
           }
@@ -126,7 +126,7 @@ export async function run(
             envURL: getInput('env_url', {required: false})
           }
 
-          if (args.logArgs) {
+          if (args.isDebug) {
             console.log(`'${step}' arguments`, args)
           }
 
@@ -135,7 +135,7 @@ export async function run(
           if (args.envURL) {
             const isMulti = args.envURL.split(',').length > 1
 
-            if (args.logArgs) {
+            if (args.isDebug) {
               console.log(`Is a multi environment : ${isMulti}`)
             }
 
@@ -160,7 +160,7 @@ export async function run(
             return
           }
 
-          if (args.logArgs) {
+          if (args.isDebug) {
             console.log(
               `finishing deployment for ${args.deployment} with status ${args.status}`
             )
@@ -215,7 +215,7 @@ export async function run(
             environment: getInput('env', {required: false})
           }
 
-          if (args.logArgs) {
+          if (args.isDebug) {
             console.log(`'${step}' arguments`, args)
           }
 
@@ -251,7 +251,7 @@ export async function run(
             environment: getInput('env', {required: false})
           }
 
-          if (args.logArgs) {
+          if (args.isDebug) {
             console.log(`'${step}' arguments`, args)
           }
 
