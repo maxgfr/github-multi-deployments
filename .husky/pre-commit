@@ -3,3 +3,4 @@
 
 yarn all
 yarn lint-staged
+git add -A .

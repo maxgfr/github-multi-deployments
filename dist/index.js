@@ -164,7 +164,7 @@ function run(step, context) {
             switch (step) {
                 case Step.Start:
                     {
-                        const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: true }), noOverride: (0, core_1.getInput)('no_override') !== 'false', transient: (0, core_1.getInput)('transient') === 'true', gitRef: (0, core_1.getInput)('ref') || context.ref });
+                        const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: true }), override: (0, core_1.getInput)('override'), gitRef: (0, core_1.getInput)('ref') || context.ref });
                         if (args.logArgs) {
                             console.log(`'${step}' arguments`, args);
                         }
@@ -185,7 +185,7 @@ function run(step, context) {
                         const promises = [];
                         const deactivatePromises = [];
                         for (let i = 0; i < environments.length; i++) {
-                            if (!args.noOverride) {
+                            if (!args.override) {
                                 deactivatePromises.push((0, deactivate_1.default)(context, environments[i]));
                             }
                             promises.push(github.rest.repos.createDeployment({
@@ -195,7 +195,7 @@ function run(step, context) {
                                 required_contexts: [],
                                 environment: environments[i],
                                 auto_merge: false,
-                                transient_environment: args.transient,
+                                transient_environment: true,
                                 description: args.description
                             }));
                         }
@@ -219,6 +219,7 @@ function run(step, context) {
                                 deployment_id: parseInt(deployment.data.id, 10),
                                 state: 'in_progress',
                                 auto_inactive: args.autoInactive,
+                                ref: context.ref,
                                 log_url: args.logsURL,
                                 description: args.description
                             }));
@@ -264,6 +265,7 @@ function run(step, context) {
                                 deployment_id: parseInt(deployment.id, 10),
                                 auto_inactive: args.autoInactive,
                                 state: newStatus,
+                                ref: context.ref,
                                 description: args.description,
                                 environment_url: args.envURL || deployment.url,
                                 log_url: args.logsURL
