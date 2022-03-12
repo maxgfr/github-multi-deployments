@@ -73,66 +73,18 @@ function deactivateEnvironment({ github: client, owner, repo }, environment) {
         console.log(`found ${existing} existing deployments for env ${environment} - marking as ${deadState}`);
         for (let i = 0; i < existing; i++) {
             const deployment = deployments.data[i];
-            if (deployment.environment === environment) {
-                console.log(`setting deployment '${environment}.${deployment.id}' (${deployment.sha}) state to "${deadState}"`);
-                yield client.rest.repos.createDeploymentStatus({
-                    owner,
-                    repo,
-                    deployment_id: deployment.id,
-                    state: deadState,
-                });
-            }
+            console.log(`setting deployment '${environment}.${deployment.id}' (${deployment.sha}) state to "${deadState}"`);
+            yield client.rest.repos.createDeploymentStatus({
+                owner,
+                repo,
+                deployment_id: deployment.id,
+                state: deadState,
+            });
         }
         console.log(`${existing} deployments updated`);
     });
 }
 exports.default = deactivateEnvironment;
-
-
-/***/ }),
-
-/***/ 6037:
-/***/ (function(__unused_webpack_module, exports) {
-
-"use strict";
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-function deleteEnvironment({ github: client, owner, repo }, environment) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const deployments = yield client.rest.repos.listDeployments({
-            owner,
-            repo,
-            environment,
-        });
-        const existing = deployments.data.length;
-        if (existing < 1) {
-            console.log(`found no existing deployments for env ${environment}`);
-            return;
-        }
-        for (let i = 0; i < existing; i++) {
-            const deployment = deployments.data[i];
-            console.log(`setting deployment '${environment}.${deployment.id}' (${deployment.sha}) "`);
-            if (deployment.environment === environment) {
-                yield client.rest.repos.deleteAnEnvironment({
-                    owner,
-                    repo,
-                    environment_name: deployment.environment,
-                });
-            }
-        }
-        console.log(`${existing} deployments updated`);
-    });
-}
-exports.default = deleteEnvironment;
 
 
 /***/ }),
@@ -198,7 +150,6 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = exports.Step = void 0;
 const core_1 = __nccwpck_require__(2186);
 const deactivate_1 = __importDefault(__nccwpck_require__(4433));
-const delete_1 = __importDefault(__nccwpck_require__(6037));
 var Step;
 (function (Step) {
     Step["Start"] = "start";
@@ -392,7 +343,11 @@ function run(step, context) {
                         }
                         const promises = [];
                         environments.map((env) => {
-                            promises.push((0, delete_1.default)(context, env));
+                            promises.push(github.rest.repos.deleteAnEnvironment({
+                                owner: context.owner,
+                                repo: context.repo,
+                                environment_name: env
+                            }));
                         });
                         try {
                             yield Promise.all(promises);

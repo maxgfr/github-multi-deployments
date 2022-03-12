@@ -1,7 +1,6 @@
 import {getInput, setOutput, error, setFailed} from '@actions/core'
 import {DeploymentContext} from '../lib/context'
 import deactivateEnvironment from '../lib/deactivate'
-import deleteEnvironment from '../lib/delete'
 
 export enum Step {
   Start = 'start',
@@ -270,7 +269,13 @@ export async function run(
           const promises: any = []
 
           environments.map((env: string) => {
-            promises.push(deleteEnvironment(context, env))
+            promises.push(
+              github.rest.repos.deleteAnEnvironment({
+                owner: context.owner,
+                repo: context.repo,
+                environment_name: env
+              })
+            )
           })
 
           try {

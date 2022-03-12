@@ -21,18 +21,15 @@ async function deactivateEnvironment(
   );
   for (let i = 0; i < existing; i++) {
     const deployment = deployments.data[i];
-
-    if(deployment.environment === environment) {
-      console.log(
-        `setting deployment '${environment}.${deployment.id}' (${deployment.sha}) state to "${deadState}"`
-      );
-      await client.rest.repos.createDeploymentStatus({
-        owner,
-        repo,
-        deployment_id: deployment.id,
-        state: deadState,
-      });
-    }
+    console.log(
+      `setting deployment '${environment}.${deployment.id}' (${deployment.sha}) state to "${deadState}"`
+    );
+    await client.rest.repos.createDeploymentStatus({
+      owner,
+      repo,
+      deployment_id: deployment.id,
+      state: deadState,
+    });
   }
 
   console.log(`${existing} deployments updated`);

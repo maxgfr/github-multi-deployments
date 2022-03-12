@@ -29,7 +29,7 @@ jobs:
         with:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
-          environment: '["envA", "envB"]'
+          env: '["envA", "envB"]'
           log_args: true
       - name: Sleep for 30 seconds
         uses: jakejarvis/wait-action@master
@@ -40,7 +40,7 @@ jobs:
         with:
           step: delete-env
           token: ${{ secrets.GITHUB_TOKEN }}
-          environment: '["envA", "envB"]'
+          env: '["envA", "envB"]'
           log_args: true
       - name: Sleep for 30 seconds
         uses: jakejarvis/wait-action@master
