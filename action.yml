@@ -21,6 +21,9 @@ inputs:
   ref:
     required: false
     description: The git ref to use for the deploy, defaults to `github.ref`
+  repository:
+    required: false
+    description: Set status for a different repository, using the format `$owner/$repository` (optional, defaults to the current repository)
   env:
     required: false
     description: The name of the deployment environment for Github. It could be an array of string. (Required for `start`, `deactivate-env` and `delete-env`)

@@ -1,7 +1,7 @@
 require('./sourcemap-register.js');/******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
-/***/ 2068:
+/***/ 3842:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -12,15 +12,15 @@ const core_1 = __nccwpck_require__(2186);
 const github_1 = __nccwpck_require__(5438);
 function collectDeploymentContext() {
     const { ref, sha } = github_1.context;
-    const customRepository = (0, core_1.getInput)("repository", { required: false });
+    const customRepository = (0, core_1.getInput)('repository', { required: false });
     const [owner, repo] = customRepository
-        ? customRepository.split("/")
+        ? customRepository.split('/')
         : [github_1.context.repo.owner, github_1.context.repo.repo];
     if (!owner || !repo) {
         throw new Error(`invalid target repository: ${owner}/${repo}`);
     }
-    const github = (0, github_1.getOctokit)((0, core_1.getInput)("token", { required: true }), {
-        previews: ["ant-man-preview", "flash-preview"],
+    const github = (0, github_1.getOctokit)((0, core_1.getInput)('token', { required: true }), {
+        previews: ['ant-man-preview', 'flash-preview']
     });
     return {
         ref,
@@ -29,12 +29,10 @@ function collectDeploymentContext() {
         repo,
         github,
         coreArgs: {
-            autoInactive: (0, core_1.getInput)("auto_inactive") !== "false",
-            logsURL: (0, core_1.getInput)("logs") ||
-                `https://github.com/${owner}/${repo}/commit/${sha}/checks`,
-            description: (0, core_1.getInput)("desc"),
-            logArgs: (0, core_1.getInput)("log_args") === "true",
-        },
+            logsURL: `https://github.com/${owner}/${repo}/commit/${sha}/checks`,
+            description: (0, core_1.getInput)('description'),
+            logArgs: (0, core_1.getInput)('log_args') === 'true'
+        }
     };
 }
 exports.collectDeploymentContext = collectDeploymentContext;
@@ -42,7 +40,7 @@ exports.collectDeploymentContext = collectDeploymentContext;
 
 /***/ }),
 
-/***/ 4433:
+/***/ 3562:
 /***/ (function(__unused_webpack_module, exports) {
 
 "use strict";
@@ -62,14 +60,14 @@ function deactivateEnvironment({ github: client, owner, repo }, environment) {
         const deployments = yield client.rest.repos.listDeployments({
             owner,
             repo,
-            environment,
+            environment
         });
         const existing = deployments.data.length;
         if (existing < 1) {
             console.log(`found no existing deployments for env ${environment}`);
             return;
         }
-        const deadState = "inactive";
+        const deadState = 'inactive';
         console.log(`found ${existing} existing deployments for env ${environment} - marking as ${deadState}`);
         for (let i = 0; i < existing; i++) {
             const deployment = deployments.data[i];
@@ -78,7 +76,7 @@ function deactivateEnvironment({ github: client, owner, repo }, environment) {
                 owner,
                 repo,
                 deployment_id: deployment.id,
-                state: deadState,
+                state: deadState
             });
         }
         console.log(`${existing} deployments updated`);
@@ -119,8 +117,8 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(2186));
-const context_1 = __nccwpck_require__(2068);
-const steps_1 = __nccwpck_require__(4683);
+const context_1 = __nccwpck_require__(3842);
+const steps_1 = __nccwpck_require__(4106);
 const context = (0, context_1.collectDeploymentContext)();
 console.log(`targeting ${context.owner}/${context.repo}`);
 const step = core.getInput('step', { required: true });
@@ -129,7 +127,7 @@ const step = core.getInput('step', { required: true });
 
 /***/ }),
 
-/***/ 4683:
+/***/ 4106:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -149,8 +147,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = exports.Step = void 0;
 const core_1 = __nccwpck_require__(2186);
-const deactivate_1 = __importDefault(__nccwpck_require__(4433));
-const url_1 = __nccwpck_require__(9422);
+const deactivate_1 = __importDefault(__nccwpck_require__(3562));
+const url_1 = __nccwpck_require__(8615);
 var Step;
 (function (Step) {
     Step["Start"] = "start";
@@ -217,7 +215,8 @@ function run(step, context) {
                                 deployment_id: parseInt(deployment.data.id, 10),
                                 state: 'in_progress',
                                 ref: context.ref,
-                                description: args.description
+                                description: args.description,
+                                log_url: args.logsURL
                             }));
                         });
                         try {
@@ -286,7 +285,8 @@ function run(step, context) {
                                         : (0, url_1.isValidUrl)(dep.deployment_url)
                                             ? dep.deployment_url
                                             : ''
-                                    : ''
+                                    : '',
+                                log_url: args.logsURL
                             });
                         }));
                         try {
@@ -370,7 +370,7 @@ exports.run = run;
 
 /***/ }),
 
-/***/ 9422:
+/***/ 8615:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";

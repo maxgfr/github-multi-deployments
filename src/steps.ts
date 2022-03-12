@@ -1,7 +1,7 @@
 import {getInput, setOutput, error, setFailed} from '@actions/core'
-import {DeploymentContext} from '../lib/context'
-import deactivateEnvironment from '../lib/deactivate'
-import {isValidUrl} from '../utils/url'
+import {DeploymentContext} from './context'
+import deactivateEnvironment from './deactivate'
+import {isValidUrl} from './url'
 
 export enum Step {
   Start = 'start',
@@ -89,7 +89,8 @@ export async function run(
                 deployment_id: parseInt(deployment.data.id, 10),
                 state: 'in_progress',
                 ref: context.ref,
-                description: args.description
+                description: args.description,
+                log_url: args.logsURL
               })
             )
           })
@@ -192,7 +193,8 @@ export async function run(
                     : isValidUrl(dep.deployment_url)
                     ? dep.deployment_url
                     : ''
-                  : ''
+                  : '',
+              log_url: args.logsURL
             })
           )
 
