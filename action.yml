@@ -42,10 +42,10 @@ inputs:
   status:
     required: false
     description: The deployment status. (For `finish` only)
-  no_override:
+  override:
     required: false
-    description: Whether to mark existing deployments of this environment as inactive
-    default: 'true'
+    description: Whether to manually mark existing deployments of this environment as inactive (for `start` only)
+    default: 'false'
   log_args:
     required: false
     description: Print arguments used by this action.

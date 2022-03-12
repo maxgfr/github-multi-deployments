@@ -21,8 +21,7 @@ export async function run(
           const args = {
             ...context.coreArgs,
             environment: getInput('env', {required: true}),
-            noOverride: getInput('no_override') !== 'false',
-            transient: getInput('transient') === 'true',
+            override: getInput('override'),
             gitRef: getInput('ref') || context.ref
           }
 
@@ -51,7 +50,7 @@ export async function run(
           const promises: any = []
           const deactivatePromises: any = []
           for (let i = 0; i < environments.length; i++) {
-            if (!args.noOverride) {
+            if (!args.override) {
               deactivatePromises.push(
                 deactivateEnvironment(context, environments[i])
               )
@@ -64,7 +63,7 @@ export async function run(
                 required_contexts: [],
                 environment: environments[i],
                 auto_merge: false,
-                transient_environment: args.transient,
+                transient_environment: true,
                 description: args.description
               })
             )
@@ -94,6 +93,7 @@ export async function run(
                 deployment_id: parseInt(deployment.data.id, 10),
                 state: 'in_progress',
                 auto_inactive: args.autoInactive,
+                ref: context.ref,
                 log_url: args.logsURL,
                 description: args.description
               })
@@ -167,6 +167,7 @@ export async function run(
               deployment_id: parseInt(deployment.id, 10),
               auto_inactive: args.autoInactive,
               state: newStatus,
+              ref: context.ref,
               description: args.description,
               environment_url: args.envURL || deployment.url,
               log_url: args.logsURL
@@ -242,7 +243,7 @@ export async function run(
 
           const promises: any = []
 
-          environments.map((env: any) => {
+          environments.map((env: string) => {
             promises.push(
               github.rest.repos.deleteAnEnvironment({
                 owner: context.owner,
