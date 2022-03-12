@@ -108,7 +108,7 @@ export async function run(
                 ? JSON.stringify(
                     deploymentsData.map((deployment: any, index: number) => ({
                       ...deployment,
-                      url: environments[index]
+                      deployment_url: environments[index]
                     }))
                   )
                 : deploymentsData[0].data.id
@@ -131,6 +131,22 @@ export async function run(
 
           if (args.logArgs) {
             console.log(`'${step}' arguments`, args)
+          }
+
+          let environmentsUrl: any
+
+          if (args.envURL) {
+            const isMulti = args.envURL.split(',').length > 1
+
+            if (args.logArgs) {
+              console.log(`Is a multi environment : ${isMulti}`)
+            }
+
+            if (isMulti) {
+              environmentsUrl = JSON.parse(args.envURL)
+            } else {
+              environmentsUrl = [args.envURL]
+            }
           }
 
           if (
@@ -156,11 +172,17 @@ export async function run(
           const newStatus =
             args.status === 'cancelled' ? 'inactive' : args.status
 
-          const deployments: {data: {id: string; url: string}}[] = JSON.parse(
-            args.deployment
-          )
+          const deployments: {data: {id: string}; deployment_url: string}[] =
+            JSON.parse(args.deployment)
 
-          const promises = deployments.map(async dep =>
+          if (
+            environmentsUrl &&
+            deployments.length !== environmentsUrl.length
+          ) {
+            error('deployment_id and env_url must have the same length')
+          }
+
+          const promises = deployments.map(async (dep, i) =>
             github.rest.repos.createDeploymentStatus({
               owner: context.owner,
               repo: context.repo,
@@ -170,7 +192,9 @@ export async function run(
               ref: context.ref,
               description: args.description,
               environment_url:
-                newStatus === 'success' ? args.envURL || dep.data.url : '',
+                newStatus === 'success'
+                  ? environmentsUrl[i] || dep.deployment_url || ''
+                  : '',
               log_url: args.logsURL
             })
           )
@@ -209,7 +233,7 @@ export async function run(
 
           const promises: any = []
 
-          environments.map((env: any) => {
+          environments.map((env: string) => {
             promises.push(deactivateEnvironment(context, env))
           })
 

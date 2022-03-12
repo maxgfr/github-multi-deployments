@@ -227,7 +227,7 @@ function run(step, context) {
                         try {
                             yield Promise.all(secondPromises);
                             (0, core_1.setOutput)('deployment_id', isMulti
-                                ? JSON.stringify(deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment), { url: environments[index] }))))
+                                ? JSON.stringify(deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment), { deployment_url: environments[index] }))))
                                 : deploymentsData[0].data.id);
                             (0, core_1.setOutput)('env', args.environment);
                         }
@@ -241,6 +241,19 @@ function run(step, context) {
                         const args = Object.assign(Object.assign({}, context.coreArgs), { status: (0, core_1.getInput)('status', { required: true }).toLowerCase(), deployment: (0, core_1.getInput)('deployment_id', { required: true }), envURL: (0, core_1.getInput)('env_url', { required: false }) });
                         if (args.logArgs) {
                             console.log(`'${step}' arguments`, args);
+                        }
+                        let environmentsUrl;
+                        if (args.envURL) {
+                            const isMulti = args.envURL.split(',').length > 1;
+                            if (args.logArgs) {
+                                console.log(`Is a multi environment : ${isMulti}`);
+                            }
+                            if (isMulti) {
+                                environmentsUrl = JSON.parse(args.envURL);
+                            }
+                            else {
+                                environmentsUrl = [args.envURL];
+                            }
                         }
                         if (args.status !== 'success' &&
                             args.status !== 'failure' &&
@@ -258,7 +271,11 @@ function run(step, context) {
                         }
                         const newStatus = args.status === 'cancelled' ? 'inactive' : args.status;
                         const deployments = JSON.parse(args.deployment);
-                        const promises = deployments.map((dep) => __awaiter(this, void 0, void 0, function* () {
+                        if (environmentsUrl &&
+                            deployments.length !== environmentsUrl.length) {
+                            (0, core_1.error)('deployment_id and env_url must have the same length');
+                        }
+                        const promises = deployments.map((dep, i) => __awaiter(this, void 0, void 0, function* () {
                             return github.rest.repos.createDeploymentStatus({
                                 owner: context.owner,
                                 repo: context.repo,
@@ -267,7 +284,9 @@ function run(step, context) {
                                 state: newStatus,
                                 ref: context.ref,
                                 description: args.description,
-                                environment_url: newStatus === 'success' ? args.envURL || dep.data.url : '',
+                                environment_url: newStatus === 'success'
+                                    ? environmentsUrl[i] || dep.deployment_url || ''
+                                    : '',
                                 log_url: args.logsURL
                             });
                         }));
