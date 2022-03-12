@@ -70,7 +70,10 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           deployment_id: ${{ steps.deployment2.outputs.deployment_id }}
           log_args: true
-
+      - name: Extract branch name
+        id: get_branch
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/} | tr / -)"
       - name: start deployment
         uses: bobheadxi/deployments@v1
         id: deploymentX
@@ -88,3 +91,10 @@ jobs:
           status: 'success'
           env: ${{ steps.deploymentX.outputs.env }}
           deployment_id: ${{ steps.deploymentX.outputs.deployment_id }}
+      - name: mark environment as deactivated
+        uses: bobheadxi/deployments@v1
+        with:
+          step: deactivate-env
+          token: ${{ secrets.GITHUB_TOKEN }}
+          env: ${{ steps.get_branch.outputs.branch }}
+          desc: Environment was pruned
