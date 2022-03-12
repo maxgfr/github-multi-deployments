@@ -222,7 +222,7 @@ function run(step, context) {
                         try {
                             yield Promise.all(secondPromises);
                             (0, core_1.setOutput)('deployment_id', isMulti
-                                ? JSON.stringify(deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment), { deployment_url: environments[index] }))))
+                                ? JSON.stringify(deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment.data), { deployment_url: environments[index] }))))
                                 : deploymentsData[0].data.id);
                             (0, core_1.setOutput)('env', args.environment);
                         }
@@ -275,7 +275,7 @@ function run(step, context) {
                             return github.rest.repos.createDeploymentStatus({
                                 owner: context.owner,
                                 repo: context.repo,
-                                deployment_id: parseInt(dep.data.id, 10),
+                                deployment_id: parseInt(dep.id, 10),
                                 state: newStatus,
                                 ref: context.ref,
                                 description: args.description,
@@ -287,9 +287,6 @@ function run(step, context) {
                             });
                         }));
                         try {
-                            if (args.logArgs) {
-                                console.log(`finishing deployment with status ${args.status}`);
-                            }
                             yield Promise.all(promises);
                         }
                         catch (e) {

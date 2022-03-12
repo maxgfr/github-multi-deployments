@@ -100,7 +100,7 @@ export async function run(
               isMulti
                 ? JSON.stringify(
                     deploymentsData.map((deployment: any, index: number) => ({
-                      ...deployment,
+                      ...deployment.data,
                       deployment_url: environments[index]
                     }))
                   )
@@ -166,7 +166,7 @@ export async function run(
           const newStatus =
             args.status === 'cancelled' ? 'inactive' : args.status
 
-          const deployments: {data: {id: string}; deployment_url: string}[] =
+          const deployments: {id: string; deployment_url: string}[] =
             JSON.parse(args.deployment)
 
           if (
@@ -180,7 +180,7 @@ export async function run(
             github.rest.repos.createDeploymentStatus({
               owner: context.owner,
               repo: context.repo,
-              deployment_id: parseInt(dep.data.id, 10),
+              deployment_id: parseInt(dep.id, 10),
               state: newStatus,
               ref: context.ref,
               description: args.description,
@@ -194,9 +194,6 @@ export async function run(
           )
 
           try {
-            if (args.logArgs) {
-              console.log(`finishing deployment with status ${args.status}`)
-            }
             await Promise.all(promises)
           } catch (e) {
             console.log(e)
