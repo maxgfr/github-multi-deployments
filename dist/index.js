@@ -155,6 +155,7 @@ var Step;
     Step["Start"] = "start";
     Step["Finish"] = "finish";
     Step["DeactivateEnv"] = "deactivate-env";
+    Step["DeleteEnv"] = "delete-env";
 })(Step = exports.Step || (exports.Step = {}));
 function run(step, context) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -163,24 +164,30 @@ function run(step, context) {
             switch (step) {
                 case Step.Start:
                     {
-                        const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: false }), environments: (0, core_1.getInput)('envs', { required: false }), noOverride: (0, core_1.getInput)('no_override') !== 'false', transient: (0, core_1.getInput)('transient') === 'true', gitRef: (0, core_1.getInput)('ref') || context.ref });
+                        const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: true }), noOverride: (0, core_1.getInput)('no_override') !== 'false', transient: (0, core_1.getInput)('transient') === 'true', gitRef: (0, core_1.getInput)('ref') || context.ref });
                         if (args.logArgs) {
                             console.log(`'${step}' arguments`, args);
                         }
-                        const isMulti = args.environments && args.environments.length > 1;
-                        const environments = JSON.parse(args.environments);
+                        let environments = [];
+                        const isMulti = args.environment.split(',').length > 1;
+                        if (isMulti) {
+                            environments = JSON.parse(args.environment);
+                        }
+                        else {
+                            environments = [args.environment];
+                        }
                         const promises = [];
                         const deactivatePromises = [];
                         for (let i = 0; i < environments.length; i++) {
                             if (!args.noOverride) {
-                                deactivatePromises.push((0, deactivate_1.default)(context, isMulti ? environments[i] : args.environment));
+                                deactivatePromises.push((0, deactivate_1.default)(context, environments[i]));
                             }
                             promises.push(github.rest.repos.createDeployment({
                                 owner: context.owner,
                                 repo: context.repo,
                                 ref: args.gitRef,
                                 required_contexts: [],
-                                environment: isMulti ? environments[i] : args.environment,
+                                environment: environments[i],
                                 auto_merge: false,
                                 transient_environment: args.transient,
                                 description: args.description
@@ -212,13 +219,9 @@ function run(step, context) {
                         });
                         try {
                             yield Promise.all(secondPromises);
-                            if (!isMulti) {
-                                (0, core_1.setOutput)('deployment_id', deploymentsData[0].data.id);
-                            }
-                            else {
-                                (0, core_1.setOutput)('deployments', JSON.stringify(deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment), { url: environments[index] })))));
-                                (0, core_1.setOutput)('envs', args.environments);
-                            }
+                            (0, core_1.setOutput)('deployment_id', isMulti
+                                ? JSON.stringify(deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment), { url: environments[index] }))))
+                                : deploymentsData[0].data.id);
                             (0, core_1.setOutput)('env', args.environment);
                         }
                         catch (e) {
@@ -228,50 +231,42 @@ function run(step, context) {
                     break;
                 case Step.Finish:
                     {
-                        const args = Object.assign(Object.assign({}, context.coreArgs), { status: (0, core_1.getInput)('status', { required: true }).toLowerCase(), deployments: (0, core_1.getInput)('deployments', { required: false }), deploymentID: (0, core_1.getInput)('deployment_id', { required: false }), envURL: (0, core_1.getInput)('env_url', { required: false }) });
+                        const args = Object.assign(Object.assign({}, context.coreArgs), { status: (0, core_1.getInput)('status', { required: true }).toLowerCase(), deployment: (0, core_1.getInput)('deployment_id', { required: true }), envURL: (0, core_1.getInput)('env_url', { required: false }) });
                         if (args.logArgs) {
                             console.log(`'${step}' arguments`, args);
                         }
                         if (args.status !== 'success' &&
                             args.status !== 'failure' &&
-                            args.status !== 'cancelled') {
+                            args.status !== 'cancelled' &&
+                            args.status !== 'error' &&
+                            args.status !== 'inactive' &&
+                            args.status !== 'in_progress' &&
+                            args.status !== 'queued' &&
+                            args.status !== 'pending') {
                             (0, core_1.error)(`unexpected status ${args.status}`);
                             return;
                         }
-                        console.log(`finishing deployment for ${args.deploymentID} with status ${args.status}`);
+                        if (args.logArgs) {
+                            console.log(`finishing deployment for ${args.deployment} with status ${args.status}`);
+                        }
                         const newStatus = args.status === 'cancelled' ? 'inactive' : args.status;
-                        const isMulti = args.deployments && args.deployments.length > 1;
-                        if (!isMulti) {
-                            console.log(`finishing deployment for ${args.deploymentID} with status ${args.status}`);
-                            yield github.rest.repos.createDeploymentStatus({
+                        const deployments = JSON.parse(args.deployment);
+                        const promises = deployments.map((deployment) => __awaiter(this, void 0, void 0, function* () {
+                            return github.rest.repos.createDeploymentStatus({
                                 owner: context.owner,
                                 repo: context.repo,
-                                deployment_id: parseInt(args.deploymentID, 10),
-                                state: newStatus,
+                                deployment_id: parseInt(deployment.id, 10),
                                 auto_inactive: args.autoInactive,
+                                state: newStatus,
                                 description: args.description,
-                                // only set environment_url if deployment worked
-                                environment_url: newStatus === 'success' ? args.envURL : '',
-                                // set log_url to action by default
+                                environment_url: args.envURL || deployment.url,
                                 log_url: args.logsURL
                             });
-                            return;
-                        }
-                        const deployments = JSON.parse(args.deployments);
-                        const promises = [];
-                        deployments.map((deployment) => {
-                            promises.push(github.rest.repos.createDeploymentStatus({
-                                owner: context.owner,
-                                repo: context.repo,
-                                deployment_id: parseInt(deployment.data.id, 10),
-                                auto_inactive: true,
-                                state: newStatus,
-                                description: `Deployment URL: ${deployment.url}`,
-                                environment_url: newStatus === 'success' ? `${deployment.url}` : '',
-                                log_url: args.logsURL
-                            }));
-                        });
+                        }));
                         try {
+                            if (args.logArgs) {
+                                console.log(`finishing deployment with status ${args.status}`);
+                            }
                             yield Promise.all(promises);
                         }
                         catch (e) {
@@ -281,26 +276,57 @@ function run(step, context) {
                     break;
                 case Step.DeactivateEnv:
                     {
-                        const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: false }), environments: (0, core_1.getInput)('envs', { required: false }) });
+                        const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: false }) });
                         if (args.logArgs) {
                             console.log(`'${step}' arguments`, args);
                         }
-                        const isMulti = args.environments && args.environments.length > 1;
+                        let environments;
+                        const isMulti = args.environment.split(',').length > 1;
                         if (isMulti) {
-                            const envs = JSON.parse(args.environments);
-                            const promises = [];
-                            envs.map((env) => {
-                                promises.push((0, deactivate_1.default)(context, env));
-                            });
-                            try {
-                                yield Promise.all(promises);
-                            }
-                            catch (e) {
-                                (0, core_1.error)('Cannot deactivate deployment status');
-                            }
+                            environments = JSON.parse(args.environment);
                         }
                         else {
-                            yield (0, deactivate_1.default)(context, args.environment);
+                            environments = [args.environment];
+                        }
+                        const promises = [];
+                        environments.map((env) => {
+                            promises.push((0, deactivate_1.default)(context, env));
+                        });
+                        try {
+                            yield Promise.all(promises);
+                        }
+                        catch (e) {
+                            (0, core_1.error)('Cannot deactivate deployment status');
+                        }
+                    }
+                    break;
+                case Step.DeleteEnv:
+                    {
+                        const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: false }) });
+                        if (args.logArgs) {
+                            console.log(`'${step}' arguments`, args);
+                        }
+                        let environments;
+                        const isMulti = args.environment.split(',').length > 1;
+                        if (isMulti) {
+                            environments = JSON.parse(args.environment);
+                        }
+                        else {
+                            environments = [args.environment];
+                        }
+                        const promises = [];
+                        environments.map((env) => {
+                            promises.push(github.rest.repos.deleteAnEnvironment({
+                                owner: context.owner,
+                                repo: context.repo,
+                                environment_name: env
+                            }));
+                        });
+                        try {
+                            yield Promise.all(promises);
+                        }
+                        catch (e) {
+                            (0, core_1.error)('Cannot deactivate deployment status');
                         }
                     }
                     break;
@@ -308,8 +334,8 @@ function run(step, context) {
                     (0, core_1.setFailed)(`unknown step type ${step}`);
             }
         }
-        catch (err) {
-            (0, core_1.setFailed)(`unexpected error encountered: ${err.message}`);
+        catch (error) {
+            (0, core_1.setFailed)(`unexpected error encountered: ${error}`);
         }
     });
 }

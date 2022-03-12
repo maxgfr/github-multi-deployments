@@ -18,7 +18,7 @@ jobs:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
           desc: 'Deploying environment A and environment B'
-          env: '["envA", "envB"]'
+          env: "['envA', 'envB']"
           log_args: true
       - name: Sleep for 30 seconds
         uses: jakejarvis/wait-action@master
