@@ -1,6 +1,7 @@
 import {getInput, setOutput, error, setFailed} from '@actions/core'
 import {DeploymentContext} from '../lib/context'
 import deactivateEnvironment from '../lib/deactivate'
+import {isValidUrl} from '../utils/url'
 
 export enum Step {
   Start = 'start',
@@ -188,27 +189,12 @@ export async function run(
                 newStatus === 'success'
                   ? environmentsUrl
                     ? environmentsUrl[i]
-                    : dep.deployment_url
+                    : isValidUrl(dep.deployment_url)
+                    ? dep.deployment_url
+                    : ''
                   : ''
             })
           )
-
-          deployments.map((dep, i) => {
-            console.log({
-              owner: context.owner,
-              repo: context.repo,
-              deployment_id: parseInt(dep.id, 10),
-              state: newStatus,
-              ref: context.ref,
-              description: args.description,
-              environment_url:
-                newStatus === 'success'
-                  ? environmentsUrl
-                    ? environmentsUrl[i]
-                    : dep.deployment_url
-                  : ''
-            })
-          })
 
           try {
             await Promise.all(promises)

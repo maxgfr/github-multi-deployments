@@ -150,6 +150,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = exports.Step = void 0;
 const core_1 = __nccwpck_require__(2186);
 const deactivate_1 = __importDefault(__nccwpck_require__(4433));
+const url_1 = __nccwpck_require__(9422);
 var Step;
 (function (Step) {
     Step["Start"] = "start";
@@ -282,25 +283,12 @@ function run(step, context) {
                                 environment_url: newStatus === 'success'
                                     ? environmentsUrl
                                         ? environmentsUrl[i]
-                                        : dep.deployment_url
+                                        : (0, url_1.isValidUrl)(dep.deployment_url)
+                                            ? dep.deployment_url
+                                            : ''
                                     : ''
                             });
                         }));
-                        deployments.map((dep, i) => {
-                            console.log({
-                                owner: context.owner,
-                                repo: context.repo,
-                                deployment_id: parseInt(dep.id, 10),
-                                state: newStatus,
-                                ref: context.ref,
-                                description: args.description,
-                                environment_url: newStatus === 'success'
-                                    ? environmentsUrl
-                                        ? environmentsUrl[i]
-                                        : dep.deployment_url
-                                    : ''
-                            });
-                        });
                         try {
                             yield Promise.all(promises);
                         }
@@ -378,6 +366,27 @@ function run(step, context) {
     });
 }
 exports.run = run;
+
+
+/***/ }),
+
+/***/ 9422:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isValidUrl = void 0;
+function isValidUrl(str) {
+    const pattern = new RegExp('^(https?:\\/\\/)?' + // protocol
+        '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|' + // domain name
+        '((\\d{1,3}\\.){3}\\d{1,3}))' + // OR ip (v4) address
+        '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*' + // port and path
+        '(\\?[;&a-z\\d%_.~+=-]*)?' + // query string
+        '(\\#[-a-z\\d_]*)?$', 'i'); // fragment locator
+    return !!pattern.test(str);
+}
+exports.isValidUrl = isValidUrl;
 
 
 /***/ }),
