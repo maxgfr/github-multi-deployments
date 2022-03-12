@@ -5,7 +5,7 @@ branding:
   icon: bookmark
   color: blue
 runs:
-  using: node16
+  using: node12
   main: dist/index.js
 
 inputs:
@@ -20,7 +20,7 @@ inputs:
     description: Description to set in status
   ref:
     required: false
-    description: The git ref to use for the deploy, defaults to `github.ref`
+    description: The git ref to use for the deploy, defaults to `github.ref or github.head_ref`
   repository:
     required: false
     description: Set status for a different repository, using the format `$owner/$repository` (optional, defaults to the current repository)

@@ -1,7 +1,7 @@
 {
   "name": "@maxgfr/multi-deployments",
   "private": true,
-  "description": "TypeScript template action",
+  "description": "Github action which lets you to handle deployments status with multiple environments",
   "main": "lib/main.js",
   "scripts": {
     "build": "tsc",
@@ -16,14 +16,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/actions/typescript-action.git"
+    "url": "git+https://github.com/maxgfr/multi-deployments.git"
   },
   "keywords": [
     "actions",
-    "node",
-    "setup"
+    "multi-deployments",
+    "deployments"
   ],
-  "author": "",
+  "author": "maxgfr",
   "license": "MIT",
   "dependencies": {
     "@actions/core": "1.6.0",

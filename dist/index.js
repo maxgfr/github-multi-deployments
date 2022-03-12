@@ -11,7 +11,8 @@ exports.collectDeploymentContext = void 0;
 const core_1 = __nccwpck_require__(2186);
 const github_1 = __nccwpck_require__(5438);
 function collectDeploymentContext() {
-    const { ref, sha } = github_1.context;
+    var _a;
+    const { sha } = github_1.context;
     const customRepository = (0, core_1.getInput)('repository', { required: false });
     const [owner, repo] = customRepository
         ? customRepository.split('/')
@@ -23,7 +24,7 @@ function collectDeploymentContext() {
         previews: ['ant-man-preview', 'flash-preview']
     });
     return {
-        ref,
+        ref: (_a = process.env.GITHUB_HEAD_REF) !== null && _a !== void 0 ? _a : (process.env.GITHUB_REF || ''),
         sha,
         owner,
         repo,
