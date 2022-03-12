@@ -60,7 +60,8 @@ export async function run(
                 required_contexts: [],
                 environment,
                 auto_merge: false,
-                description: args.description
+                description: args.description,
+                transient_environment: true
               })
             )
           }

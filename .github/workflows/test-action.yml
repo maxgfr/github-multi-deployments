@@ -94,7 +94,7 @@ jobs:
       - name: mark environment as deactivated
         uses: bobheadxi/deployments@v1
         with:
-          step: deactivate-env
+          step: delete-env
           token: ${{ secrets.GITHUB_TOKEN }}
-          env: ${{ steps.get_branch.outputs.branch }}
+          env: release
           desc: Environment was pruned
