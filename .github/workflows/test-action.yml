@@ -70,3 +70,21 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           deployment_id: ${{ steps.deployment2.outputs.deployment_id }}
           log_args: true
+
+      - name: start deployment
+        uses: bobheadxi/deployments@v1
+        id: deploymentX
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          env: release
+
+      - name: update deployment status
+        uses: bobheadxi/deployments@v1
+        if: always()
+        with:
+          step: finish
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: 'success'
+          env: ${{ steps.deploymentX.outputs.env }}
+          deployment_id: ${{ steps.deploymentX.outputs.deployment_id }}
