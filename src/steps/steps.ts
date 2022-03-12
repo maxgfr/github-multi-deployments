@@ -115,6 +115,7 @@ export async function run(
             )
             setOutput('env', args.environment)
           } catch (e) {
+            console.log(e)
             error('Cannot generate deployment status')
           }
         }
@@ -205,6 +206,7 @@ export async function run(
             }
             await Promise.all(promises)
           } catch (e) {
+            console.log(e)
             error('Cannot generate deployment status')
           }
         }
@@ -240,6 +242,7 @@ export async function run(
           try {
             await Promise.all(promises)
           } catch (e) {
+            console.log(e)
             error('Cannot deactivate deployment status')
           }
         }
@@ -281,7 +284,8 @@ export async function run(
           try {
             await Promise.all(promises)
           } catch (e) {
-            error('Cannot deactivate deployment status')
+            console.log(e)
+            error('Cannot delete env')
           }
         }
         break

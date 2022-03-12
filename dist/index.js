@@ -232,6 +232,7 @@ function run(step, context) {
                             (0, core_1.setOutput)('env', args.environment);
                         }
                         catch (e) {
+                            console.log(e);
                             (0, core_1.error)('Cannot generate deployment status');
                         }
                     }
@@ -297,6 +298,7 @@ function run(step, context) {
                             yield Promise.all(promises);
                         }
                         catch (e) {
+                            console.log(e);
                             (0, core_1.error)('Cannot generate deployment status');
                         }
                     }
@@ -323,6 +325,7 @@ function run(step, context) {
                             yield Promise.all(promises);
                         }
                         catch (e) {
+                            console.log(e);
                             (0, core_1.error)('Cannot deactivate deployment status');
                         }
                     }
@@ -353,7 +356,8 @@ function run(step, context) {
                             yield Promise.all(promises);
                         }
                         catch (e) {
-                            (0, core_1.error)('Cannot deactivate deployment status');
+                            console.log(e);
+                            (0, core_1.error)('Cannot delete env');
                         }
                     }
                     break;
