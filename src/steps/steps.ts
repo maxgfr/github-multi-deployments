@@ -49,21 +49,16 @@ export async function run(
 
           const promises: any = []
           const deactivatePromises: any = []
-          for (let i = 0; i < environments.length; i++) {
-            if (args.override) {
-              deactivatePromises.push(
-                deactivateEnvironment(context, environments[i])
-              )
-            }
+          for (const environment of environments) {
+            deactivatePromises.push(deactivateEnvironment(context, environment))
             promises.push(
               github.rest.repos.createDeployment({
                 owner: context.owner,
                 repo: context.repo,
                 ref: args.gitRef,
                 required_contexts: [],
-                environment: environments[i],
+                environment,
                 auto_merge: false,
-                transient_environment: true,
                 description: args.description
               })
             )
@@ -92,9 +87,7 @@ export async function run(
                 repo: context.repo,
                 deployment_id: parseInt(deployment.data.id, 10),
                 state: 'in_progress',
-                auto_inactive: args.autoInactive,
                 ref: context.ref,
-                log_url: args.logsURL,
                 description: args.description
               })
             )
@@ -188,15 +181,15 @@ export async function run(
               owner: context.owner,
               repo: context.repo,
               deployment_id: parseInt(dep.data.id, 10),
-              auto_inactive: args.autoInactive,
               state: newStatus,
               ref: context.ref,
               description: args.description,
               environment_url:
                 newStatus === 'success'
-                  ? environmentsUrl[i] || dep.deployment_url || ''
-                  : '',
-              log_url: args.logsURL
+                  ? environmentsUrl
+                    ? environmentsUrl[i]
+                    : dep.deployment_url
+                  : ''
             })
           )
 

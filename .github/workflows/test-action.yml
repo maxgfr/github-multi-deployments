@@ -11,22 +11,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Sleep for 15 seconds
+      - name: Sleep for 10 seconds
         uses: jakejarvis/wait-action@master
         with:
-          time: '15s'
+          time: '10s'
       - name: Notify deployment start
         uses: ./
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          desc: 'Deploying environment A and environment B'
+          description: 'Deploying environment A and environment B'
           env: '["envA", "envB"]'
           log_args: true
-      - name: Sleep for 15 seconds
+      - name: Sleep for 10 seconds
         uses: jakejarvis/wait-action@master
         with:
-          time: '15s'
+          time: '10s'
       - name: Notify deployment deactivation
         uses: ./
         with:
@@ -34,21 +34,21 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           env: '["envA", "envB"]'
           log_args: true
-      - name: Sleep for 15 seconds
+      - name: Sleep for 10 seconds
         uses: jakejarvis/wait-action@master
         with:
-          time: '15s'
+          time: '10s'
       - name: Notify deployment start
         uses: ./
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          desc: 'Deploying environment A and environment B'
+          description: 'Deploying environment A and environment B'
           env: '["envA", "envB"]'
-      - name: Sleep for 15 seconds
+      - name: Sleep for 10 seconds
         uses: jakejarvis/wait-action@master
         with:
-          time: '15s'
+          time: '10s'
       - name: Notify deployment delete
         uses: ./
         with:
@@ -56,23 +56,23 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           env: '["envA", "envB"]'
           log_args: true
-      - name: Sleep for 15 seconds
+      - name: Sleep for 10 seconds
         uses: jakejarvis/wait-action@master
         with:
-          time: '15s'
+          time: '10s'
       - name: Notify deployment start
         uses: ./
         id: deployment2
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          desc: 'Deploying environment C and environment D'
+          description: 'Deploying environment C and environment D'
           env: '["envC", "envD"]'
           log_args: true
-      - name: Sleep for 15 seconds
+      - name: Sleep for 10 seconds
         uses: jakejarvis/wait-action@master
         with:
-          time: '15s'
+          time: '10s'
       - name: Notify deployment finish
         uses: ./
         with:
