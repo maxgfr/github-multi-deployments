@@ -16,7 +16,7 @@ export interface DeploymentContext {
 }
 
 export function collectDeploymentContext(): DeploymentContext {
-  const {ref, sha} = context
+  const {sha} = context
 
   const customRepository = getInput('repository', {required: false})
 
@@ -33,7 +33,7 @@ export function collectDeploymentContext(): DeploymentContext {
   })
 
   return {
-    ref,
+    ref: process.env.GITHUB_HEAD_REF ?? (process.env.GITHUB_REF || ''),
     sha,
     owner,
     repo,
