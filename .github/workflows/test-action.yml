@@ -63,7 +63,7 @@ jobs:
         uses: ./
         with:
           step: finish
-          status: ${{ job.status }}
+          status: 'success'
           token: ${{ secrets.GITHUB_TOKEN }}
           deployment_id: ${{ steps.deployment2.outputs.deployment_id }}
           log_args: true

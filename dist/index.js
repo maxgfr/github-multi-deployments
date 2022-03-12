@@ -185,7 +185,7 @@ function run(step, context) {
                         const promises = [];
                         const deactivatePromises = [];
                         for (let i = 0; i < environments.length; i++) {
-                            if (!args.override) {
+                            if (args.override) {
                                 deactivatePromises.push((0, deactivate_1.default)(context, environments[i]));
                             }
                             promises.push(github.rest.repos.createDeployment({
@@ -258,16 +258,16 @@ function run(step, context) {
                         }
                         const newStatus = args.status === 'cancelled' ? 'inactive' : args.status;
                         const deployments = JSON.parse(args.deployment);
-                        const promises = deployments.map((deployment) => __awaiter(this, void 0, void 0, function* () {
+                        const promises = deployments.map((dep) => __awaiter(this, void 0, void 0, function* () {
                             return github.rest.repos.createDeploymentStatus({
                                 owner: context.owner,
                                 repo: context.repo,
-                                deployment_id: parseInt(deployment.id, 10),
+                                deployment_id: parseInt(dep.data.id, 10),
                                 auto_inactive: args.autoInactive,
                                 state: newStatus,
                                 ref: context.ref,
                                 description: args.description,
-                                environment_url: args.envURL || deployment.url,
+                                environment_url: newStatus === 'success' ? args.envURL || dep.data.url : '',
                                 log_url: args.logsURL
                             });
                         }));
