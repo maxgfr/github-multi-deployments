@@ -1,0 +1,69 @@
+name: 'action-test'
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'releases/*'
+
+jobs:
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Notify deployment start
+        uses: ./
+        id: deployment1
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          desc: 'Deploying environment A and environment B'
+          env: '["envA", "envB"]'
+          log_args: true
+      - name: Sleep for 30 seconds
+        uses: jakejarvis/wait-action@master
+        with:
+          time: '30s'
+      - name: Notify deployment deactivation
+        uses: ./
+        with:
+          step: deactivate-env
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: '["envA", "envB"]'
+          log_args: true
+      - name: Sleep for 30 seconds
+        uses: jakejarvis/wait-action@master
+        with:
+          time: '30s'
+      - name: Notify deployment delete
+        uses: ./
+        with:
+          step: delete-env
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: '["envA", "envB"]'
+          log_args: true
+      - name: Sleep for 30 seconds
+        uses: jakejarvis/wait-action@master
+        with:
+          time: '30s'
+      - name: Notify deployment start
+        uses: ./
+        id: deployment2
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          desc: 'Deploying environment C and environment D'
+          env: '["envC", "envD"]'
+          log_args: true
+      - name: Sleep for 30 seconds
+        uses: jakejarvis/wait-action@master
+        with:
+          time: '30s'
+      - name: Notify deployment finish
+        uses: ./
+        with:
+          step: finish
+          status: ${{ job.status }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          deployment_id: ${{ steps.deployment2.outputs.deployment_id }}
+          log_args: true
