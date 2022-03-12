@@ -1,7 +1,7 @@
 require('./sourcemap-register.js');/******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
-/***/ 2068:
+/***/ 3842:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -12,15 +12,15 @@ const core_1 = __nccwpck_require__(2186);
 const github_1 = __nccwpck_require__(5438);
 function collectDeploymentContext() {
     const { ref, sha } = github_1.context;
-    const customRepository = (0, core_1.getInput)("repository", { required: false });
+    const customRepository = (0, core_1.getInput)('repository', { required: false });
     const [owner, repo] = customRepository
-        ? customRepository.split("/")
+        ? customRepository.split('/')
         : [github_1.context.repo.owner, github_1.context.repo.repo];
     if (!owner || !repo) {
         throw new Error(`invalid target repository: ${owner}/${repo}`);
     }
-    const github = (0, github_1.getOctokit)((0, core_1.getInput)("token", { required: true }), {
-        previews: ["ant-man-preview", "flash-preview"],
+    const github = (0, github_1.getOctokit)((0, core_1.getInput)('token', { required: true }), {
+        previews: ['ant-man-preview', 'flash-preview']
     });
     return {
         ref,
@@ -29,12 +29,10 @@ function collectDeploymentContext() {
         repo,
         github,
         coreArgs: {
-            autoInactive: (0, core_1.getInput)("auto_inactive") !== "false",
-            logsURL: (0, core_1.getInput)("logs") ||
-                `https://github.com/${owner}/${repo}/commit/${sha}/checks`,
-            description: (0, core_1.getInput)("desc"),
-            logArgs: (0, core_1.getInput)("log_args") === "true",
-        },
+            logsURL: `https://github.com/${owner}/${repo}/commit/${sha}/checks`,
+            description: (0, core_1.getInput)('description'),
+            logArgs: (0, core_1.getInput)('log_args') === 'true'
+        }
     };
 }
 exports.collectDeploymentContext = collectDeploymentContext;
@@ -42,7 +40,7 @@ exports.collectDeploymentContext = collectDeploymentContext;
 
 /***/ }),
 
-/***/ 4433:
+/***/ 3562:
 /***/ (function(__unused_webpack_module, exports) {
 
 "use strict";
@@ -62,14 +60,14 @@ function deactivateEnvironment({ github: client, owner, repo }, environment) {
         const deployments = yield client.rest.repos.listDeployments({
             owner,
             repo,
-            environment,
+            environment
         });
         const existing = deployments.data.length;
         if (existing < 1) {
             console.log(`found no existing deployments for env ${environment}`);
             return;
         }
-        const deadState = "inactive";
+        const deadState = 'inactive';
         console.log(`found ${existing} existing deployments for env ${environment} - marking as ${deadState}`);
         for (let i = 0; i < existing; i++) {
             const deployment = deployments.data[i];
@@ -78,7 +76,7 @@ function deactivateEnvironment({ github: client, owner, repo }, environment) {
                 owner,
                 repo,
                 deployment_id: deployment.id,
-                state: deadState,
+                state: deadState
             });
         }
         console.log(`${existing} deployments updated`);
@@ -119,8 +117,8 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(2186));
-const context_1 = __nccwpck_require__(2068);
-const steps_1 = __nccwpck_require__(4683);
+const context_1 = __nccwpck_require__(3842);
+const steps_1 = __nccwpck_require__(4106);
 const context = (0, context_1.collectDeploymentContext)();
 console.log(`targeting ${context.owner}/${context.repo}`);
 const step = core.getInput('step', { required: true });
@@ -129,7 +127,7 @@ const step = core.getInput('step', { required: true });
 
 /***/ }),
 
-/***/ 4683:
+/***/ 4106:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -149,12 +147,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = exports.Step = void 0;
 const core_1 = __nccwpck_require__(2186);
-const deactivate_1 = __importDefault(__nccwpck_require__(4433));
+const deactivate_1 = __importDefault(__nccwpck_require__(3562));
+const url_1 = __nccwpck_require__(8615);
 var Step;
 (function (Step) {
     Step["Start"] = "start";
     Step["Finish"] = "finish";
     Step["DeactivateEnv"] = "deactivate-env";
+    Step["DeleteEnv"] = "delete-env";
 })(Step = exports.Step || (exports.Step = {}));
 function run(step, context) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -163,27 +163,37 @@ function run(step, context) {
             switch (step) {
                 case Step.Start:
                     {
-                        const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: false }), environments: (0, core_1.getInput)('envs', { required: false }), noOverride: (0, core_1.getInput)('no_override') !== 'false', transient: (0, core_1.getInput)('transient') === 'true', gitRef: (0, core_1.getInput)('ref') || context.ref });
+                        const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: true }), override: (0, core_1.getInput)('override'), gitRef: (0, core_1.getInput)('ref') || context.ref });
                         if (args.logArgs) {
                             console.log(`'${step}' arguments`, args);
                         }
-                        const isMulti = args.environments && args.environments.length > 1;
-                        const environments = JSON.parse(args.environments);
+                        let environments;
+                        const isMulti = args.environment.split(',').length > 1;
+                        if (args.logArgs) {
+                            console.log(`Is a multi environment : ${isMulti}`);
+                        }
+                        if (isMulti) {
+                            environments = JSON.parse(args.environment);
+                        }
+                        else {
+                            environments = [args.environment];
+                        }
+                        if (args.logArgs) {
+                            console.log(`Environment(s) : ${environments}`);
+                        }
                         const promises = [];
                         const deactivatePromises = [];
-                        for (let i = 0; i < environments.length; i++) {
-                            if (!args.noOverride) {
-                                deactivatePromises.push((0, deactivate_1.default)(context, isMulti ? environments[i] : args.environment));
-                            }
+                        for (const environment of environments) {
+                            deactivatePromises.push((0, deactivate_1.default)(context, environment));
                             promises.push(github.rest.repos.createDeployment({
                                 owner: context.owner,
                                 repo: context.repo,
                                 ref: args.gitRef,
                                 required_contexts: [],
-                                environment: isMulti ? environments[i] : args.environment,
+                                environment,
                                 auto_merge: false,
-                                transient_environment: args.transient,
-                                description: args.description
+                                description: args.description,
+                                transient_environment: true
                             }));
                         }
                         let deploymentsData = [];
@@ -205,102 +215,145 @@ function run(step, context) {
                                 repo: context.repo,
                                 deployment_id: parseInt(deployment.data.id, 10),
                                 state: 'in_progress',
-                                auto_inactive: args.autoInactive,
-                                log_url: args.logsURL,
-                                description: args.description
+                                ref: context.ref,
+                                description: args.description,
+                                log_url: args.logsURL
                             }));
                         });
                         try {
                             yield Promise.all(secondPromises);
-                            if (!isMulti) {
-                                (0, core_1.setOutput)('deployment_id', deploymentsData[0].data.id);
-                            }
-                            else {
-                                (0, core_1.setOutput)('deployments', JSON.stringify(deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment), { url: environments[index] })))));
-                                (0, core_1.setOutput)('envs', args.environments);
-                            }
+                            (0, core_1.setOutput)('deployment_id', isMulti
+                                ? JSON.stringify(deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment.data), { deployment_url: environments[index] }))))
+                                : deploymentsData[0].data.id);
                             (0, core_1.setOutput)('env', args.environment);
                         }
                         catch (e) {
+                            console.log(e);
                             (0, core_1.error)('Cannot generate deployment status');
                         }
                     }
                     break;
                 case Step.Finish:
                     {
-                        const args = Object.assign(Object.assign({}, context.coreArgs), { status: (0, core_1.getInput)('status', { required: true }).toLowerCase(), deployments: (0, core_1.getInput)('deployments', { required: false }), deploymentID: (0, core_1.getInput)('deployment_id', { required: false }), envURL: (0, core_1.getInput)('env_url', { required: false }) });
+                        const args = Object.assign(Object.assign({}, context.coreArgs), { status: (0, core_1.getInput)('status', { required: true }).toLowerCase(), deployment: (0, core_1.getInput)('deployment_id', { required: true }), envURL: (0, core_1.getInput)('env_url', { required: false }) });
                         if (args.logArgs) {
                             console.log(`'${step}' arguments`, args);
                         }
+                        let environmentsUrl;
+                        if (args.envURL) {
+                            const isMulti = args.envURL.split(',').length > 1;
+                            if (args.logArgs) {
+                                console.log(`Is a multi environment : ${isMulti}`);
+                            }
+                            if (isMulti) {
+                                environmentsUrl = JSON.parse(args.envURL);
+                            }
+                            else {
+                                environmentsUrl = [args.envURL];
+                            }
+                        }
                         if (args.status !== 'success' &&
                             args.status !== 'failure' &&
-                            args.status !== 'cancelled') {
+                            args.status !== 'cancelled' &&
+                            args.status !== 'error' &&
+                            args.status !== 'inactive' &&
+                            args.status !== 'in_progress' &&
+                            args.status !== 'queued' &&
+                            args.status !== 'pending') {
                             (0, core_1.error)(`unexpected status ${args.status}`);
                             return;
                         }
-                        console.log(`finishing deployment for ${args.deploymentID} with status ${args.status}`);
+                        if (args.logArgs) {
+                            console.log(`finishing deployment for ${args.deployment} with status ${args.status}`);
+                        }
                         const newStatus = args.status === 'cancelled' ? 'inactive' : args.status;
-                        const isMulti = args.deployments && args.deployments.length > 1;
-                        if (!isMulti) {
-                            console.log(`finishing deployment for ${args.deploymentID} with status ${args.status}`);
-                            yield github.rest.repos.createDeploymentStatus({
+                        const deployments = JSON.parse(args.deployment);
+                        if (environmentsUrl &&
+                            deployments.length !== environmentsUrl.length) {
+                            (0, core_1.error)('deployment_id and env_url must have the same length');
+                        }
+                        const promises = deployments.map((dep, i) => __awaiter(this, void 0, void 0, function* () {
+                            return github.rest.repos.createDeploymentStatus({
                                 owner: context.owner,
                                 repo: context.repo,
-                                deployment_id: parseInt(args.deploymentID, 10),
+                                deployment_id: parseInt(dep.id, 10),
                                 state: newStatus,
-                                auto_inactive: args.autoInactive,
+                                ref: context.ref,
                                 description: args.description,
-                                // only set environment_url if deployment worked
-                                environment_url: newStatus === 'success' ? args.envURL : '',
-                                // set log_url to action by default
+                                environment_url: newStatus === 'success'
+                                    ? environmentsUrl
+                                        ? environmentsUrl[i]
+                                        : (0, url_1.isValidUrl)(dep.deployment_url)
+                                            ? dep.deployment_url
+                                            : ''
+                                    : '',
                                 log_url: args.logsURL
                             });
-                            return;
-                        }
-                        const deployments = JSON.parse(args.deployments);
-                        const promises = [];
-                        deployments.map((deployment) => {
-                            promises.push(github.rest.repos.createDeploymentStatus({
-                                owner: context.owner,
-                                repo: context.repo,
-                                deployment_id: parseInt(deployment.data.id, 10),
-                                auto_inactive: true,
-                                state: newStatus,
-                                description: `Deployment URL: ${deployment.url}`,
-                                environment_url: newStatus === 'success' ? `${deployment.url}` : '',
-                                log_url: args.logsURL
-                            }));
-                        });
+                        }));
                         try {
                             yield Promise.all(promises);
                         }
                         catch (e) {
+                            console.log(e);
                             (0, core_1.error)('Cannot generate deployment status');
                         }
                     }
                     break;
                 case Step.DeactivateEnv:
                     {
-                        const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: false }), environments: (0, core_1.getInput)('envs', { required: false }) });
+                        const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: false }) });
                         if (args.logArgs) {
                             console.log(`'${step}' arguments`, args);
                         }
-                        const isMulti = args.environments && args.environments.length > 1;
+                        let environments;
+                        const isMulti = args.environment.split(',').length > 1;
                         if (isMulti) {
-                            const envs = JSON.parse(args.environments);
-                            const promises = [];
-                            envs.map((env) => {
-                                promises.push((0, deactivate_1.default)(context, env));
-                            });
-                            try {
-                                yield Promise.all(promises);
-                            }
-                            catch (e) {
-                                (0, core_1.error)('Cannot deactivate deployment status');
-                            }
+                            environments = JSON.parse(args.environment);
                         }
                         else {
-                            yield (0, deactivate_1.default)(context, args.environment);
+                            environments = [args.environment];
+                        }
+                        const promises = [];
+                        environments.map((env) => {
+                            promises.push((0, deactivate_1.default)(context, env));
+                        });
+                        try {
+                            yield Promise.all(promises);
+                        }
+                        catch (e) {
+                            console.log(e);
+                            (0, core_1.error)('Cannot deactivate deployment status');
+                        }
+                    }
+                    break;
+                case Step.DeleteEnv:
+                    {
+                        const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: false }) });
+                        if (args.logArgs) {
+                            console.log(`'${step}' arguments`, args);
+                        }
+                        let environments;
+                        const isMulti = args.environment.split(',').length > 1;
+                        if (isMulti) {
+                            environments = JSON.parse(args.environment);
+                        }
+                        else {
+                            environments = [args.environment];
+                        }
+                        const promises = [];
+                        environments.map((env) => {
+                            promises.push(github.rest.repos.deleteAnEnvironment({
+                                owner: context.owner,
+                                repo: context.repo,
+                                environment_name: env
+                            }));
+                        });
+                        try {
+                            yield Promise.all(promises);
+                        }
+                        catch (e) {
+                            console.log(e);
+                            (0, core_1.error)('Cannot delete env');
                         }
                     }
                     break;
@@ -308,12 +361,33 @@ function run(step, context) {
                     (0, core_1.setFailed)(`unknown step type ${step}`);
             }
         }
-        catch (err) {
-            (0, core_1.setFailed)(`unexpected error encountered: ${err.message}`);
+        catch (error) {
+            (0, core_1.setFailed)(`unexpected error encountered: ${error}`);
         }
     });
 }
 exports.run = run;
+
+
+/***/ }),
+
+/***/ 8615:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isValidUrl = void 0;
+function isValidUrl(str) {
+    const pattern = new RegExp('^(https?:\\/\\/)?' + // protocol
+        '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|' + // domain name
+        '((\\d{1,3}\\.){3}\\d{1,3}))' + // OR ip (v4) address
+        '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*' + // port and path
+        '(\\?[;&a-z\\d%_.~+=-]*)?' + // query string
+        '(\\#[-a-z\\d_]*)?$', 'i'); // fragment locator
+    return !!pattern.test(str);
+}
+exports.isValidUrl = isValidUrl;
 
 
 /***/ }),

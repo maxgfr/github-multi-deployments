@@ -1,6 +1,6 @@
 {
   "name": "@maxgfr/multi-deployments",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "description": "TypeScript template action",
   "main": "lib/main.js",
@@ -46,6 +46,6 @@
     "typescript": "^4.4.4"
   },
   "lint-staged": {
-    "*.{ts}": "npm run format --fix"
+    "*.ts": "npm run format --fix"
   }
 }
