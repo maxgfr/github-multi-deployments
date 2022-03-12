@@ -1,5 +1,5 @@
-name: GitHub Deployments
-description: GitHub action for working painlessly with deployment statuses.
+name: GitHub Multi Deployments
+description: Github actions which let to handle deployments status with multiple environments
 author: maxgfr
 branding:
   icon: bookmark
