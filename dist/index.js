@@ -168,13 +168,19 @@ function run(step, context) {
                         if (args.logArgs) {
                             console.log(`'${step}' arguments`, args);
                         }
-                        let environments = [];
+                        let environments;
                         const isMulti = args.environment.split(',').length > 1;
+                        if (args.logArgs) {
+                            console.log(`Is a multi environment : ${isMulti}`);
+                        }
                         if (isMulti) {
                             environments = JSON.parse(args.environment);
                         }
                         else {
                             environments = [args.environment];
+                        }
+                        if (args.logArgs) {
+                            console.log(`Environment(s) : ${environments}`);
                         }
                         const promises = [];
                         const deactivatePromises = [];
