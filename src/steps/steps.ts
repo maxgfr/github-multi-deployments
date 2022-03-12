@@ -193,6 +193,23 @@ export async function run(
             })
           )
 
+          deployments.map((dep, i) => {
+            console.log({
+              owner: context.owner,
+              repo: context.repo,
+              deployment_id: parseInt(dep.id, 10),
+              state: newStatus,
+              ref: context.ref,
+              description: args.description,
+              environment_url:
+                newStatus === 'success'
+                  ? environmentsUrl
+                    ? environmentsUrl[i]
+                    : dep.deployment_url
+                  : ''
+            })
+          })
+
           try {
             await Promise.all(promises)
           } catch (e) {
