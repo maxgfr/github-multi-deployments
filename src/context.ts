@@ -33,7 +33,7 @@ export function collectDeploymentContext(): DeploymentContext {
   })
 
   return {
-    ref: process.env.GITHUB_HEAD_REF ?? (process.env.GITHUB_REF || ''),
+    ref: process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF || '',
     sha,
     owner,
     repo,
