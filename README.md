@@ -78,3 +78,18 @@ jobs:
           # env_url: '["https://...."]' to bind the environments url to the deployment ids
           debug: true
 ```
+
+## Inputs
+
+**Name**|**Type**|**Required**|**Description**
+-----|-----|-----|-----
+token|string|yes|GitHub token. You must use a personal access token with repo scope enabled if you want to use `delete-env`
+step|string|yes|Key of the step to execute. Possible values are `start`, `deactivate-env`, `delete-env`, `finish`.
+description|string|no|Description to set in status.
+ref|string|no|The git ref to use for the deploy, defaults to `GITHUB_REF` or `GITHUB_HEAD_REF`
+repository|string|no|Set status for a different repository, using the format `$owner/$repository` (optional, defaults to the current repository)
+env|string|no|The name of the deployment environment for Github. It could be an array of string. (Required for `start`, `deactivate-env` and `delete-env`)
+deployment_id|string[]|no|Deployment(s) id(s) to update (if specified during `start`, the deployment will be updated instead of a new one created)
+env_url|string[]|no|Environments url (For `finish` only)
+status|string|no|Status of the deployment (For `finish` only)
+debug|boolean|no|Debug mode
