@@ -88,8 +88,8 @@ step|string|yes|Key of the step to execute. Possible values are `start`, `deacti
 description|string|no|Description to set in status.
 ref|string|no|The git ref to use for the deploy, defaults to `GITHUB_REF` or `GITHUB_HEAD_REF`
 repository|string|no|Set status for a different repository, using the format `$owner/$repository` (optional, defaults to the current repository)
-env|string|no|The name of the deployment environment for Github. It could be an array of string. (Required for `start`, `deactivate-env` and `delete-env`)
-deployment_id|string[]|no|Deployment(s) id(s) to update (if specified during `start`, the deployment will be updated instead of a new one created)
-env_url|string[]|no|Environments url (For `finish` only)
+env|string[] | string|no|Name of deployments environment for Github. (Required for `start`, `deactivate-env` and `delete-env`)
+deployment_id|string[] | string|no|Deployment(s) id(s) to update (if specified during `start`, the deployment will be updated instead of a new one created)
+env_url|string[] | string|no|Environments url (For `finish` only)
 status|string|no|Status of the deployment (For `finish` only)
 debug|boolean|no|Debug mode
