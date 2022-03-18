@@ -60,7 +60,7 @@ export async function run(
                 required_contexts: [],
                 environment,
                 auto_merge: false,
-                description: args.description,
+                description: args.desc,
                 transient_environment: true
               })
             )
@@ -90,7 +90,7 @@ export async function run(
                 deployment_id: parseInt(deployment.data.id, 10),
                 state: 'in_progress',
                 ref: context.ref,
-                description: args.description,
+                description: args.desc,
                 log_url: args.logsURL
               })
             )
@@ -186,7 +186,7 @@ export async function run(
               deployment_id: parseInt(dep.id, 10),
               state: newStatus,
               ref: context.ref,
-              description: args.description,
+              description: args.desc,
               environment_url:
                 newStatus === 'success'
                   ? environmentsUrl

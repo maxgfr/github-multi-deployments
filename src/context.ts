@@ -10,7 +10,7 @@ export interface DeploymentContext {
   github: InstanceType<typeof GitHub>
   coreArgs: {
     logsURL: string
-    description?: string
+    desc?: string
     isDebug: boolean
   }
 }
@@ -40,7 +40,7 @@ export function collectDeploymentContext(): DeploymentContext {
     github,
     coreArgs: {
       logsURL: `https://github.com/${owner}/${repo}/commit/${sha}/checks`,
-      description: getInput('description'),
+      desc: getInput('desc'),
       isDebug: getInput('debug') === 'true'
     }
   }

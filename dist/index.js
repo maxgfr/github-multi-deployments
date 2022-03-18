@@ -30,7 +30,7 @@ function collectDeploymentContext() {
         github,
         coreArgs: {
             logsURL: `https://github.com/${owner}/${repo}/commit/${sha}/checks`,
-            description: (0, core_1.getInput)('description'),
+            desc: (0, core_1.getInput)('desc'),
             isDebug: (0, core_1.getInput)('debug') === 'true'
         }
     };
@@ -192,7 +192,7 @@ function run(step, context) {
                                 required_contexts: [],
                                 environment,
                                 auto_merge: false,
-                                description: args.description,
+                                description: args.desc,
                                 transient_environment: true
                             }));
                         }
@@ -216,7 +216,7 @@ function run(step, context) {
                                 deployment_id: parseInt(deployment.data.id, 10),
                                 state: 'in_progress',
                                 ref: context.ref,
-                                description: args.description,
+                                description: args.desc,
                                 log_url: args.logsURL
                             }));
                         });
@@ -279,7 +279,7 @@ function run(step, context) {
                                 deployment_id: parseInt(dep.id, 10),
                                 state: newStatus,
                                 ref: context.ref,
-                                description: args.description,
+                                description: args.desc,
                                 environment_url: newStatus === 'success'
                                     ? environmentsUrl
                                         ? environmentsUrl[i]

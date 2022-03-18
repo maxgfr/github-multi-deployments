@@ -26,7 +26,7 @@ jobs:
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          description: 'Deploying environment A and environment B'
+          desc: 'Deploying environment A and environment B'
           env: '["envA", "envB"]'
           debug: true
       - name: Sleep for 10 seconds
@@ -61,7 +61,7 @@ jobs:
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          description: 'Deploying environment C and environment D'
+          desc: 'Deploying environment C and environment D'
           env: '["envC", "envD"]'  # you can also use url as environment such as '["https://...."]'
           debug: true
       - name: Sleep for 10 seconds
@@ -85,7 +85,7 @@ jobs:
 -----|-----|-----|-----
 token|string|yes|GitHub token. You must use a personal access token with repo scope enabled if you want to use `delete-env`
 step|string|yes|Key of the step to execute. Possible values are `start`, `deactivate-env`, `delete-env`, `finish`.
-description|string|no|Description to set in status.
+desc|string|no|Description to set in status.
 ref|string|no|The git ref to use for the deploy, defaults to `GITHUB_REF` or `GITHUB_HEAD_REF`
 repository|string|no|Set status for a different repository, using the format `$owner/$repository` (optional, defaults to the current repository)
 env|string[] or string|no|Name of deployment(s) environment for Github. (Required for `start`, `deactivate-env` and `delete-env`)

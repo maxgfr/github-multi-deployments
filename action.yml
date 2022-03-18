@@ -15,7 +15,7 @@ inputs:
   step:
     required: true
     description: One of 'start' and 'finish'
-  description:
+  desc:
     required: false
     description: Description to set in status
   ref:
