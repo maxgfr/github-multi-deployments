@@ -6,76 +6,96 @@
 
 ## Usage
 
+### Simple multi-deployment
+
 ```yml
 on:
   push:
     branches:
     - main
-
 jobs:
   action:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Sleep for 10 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '10s'
+      ...
       - name: Notify deployment start
-        uses: maxgfr/multi-deployments@main
+        uses: maxgfr/multi-deployments@v0.1.11
+        id: deployment
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          desc: 'Deploying environment C and environment D'
+          env: '["envC", "envD"]' # you can also use url as environment such as '["https://...."]'
+          debug: true
+      ...
+      - name: Notify deployment finish
+        uses: maxgfr/multi-deployments@v0.1.11
+        with:
+          step: finish
+          status: 'success'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+          # env_url: '["https://...."]' to bind the environments url to the deployment ids
+          debug: true
+```
+
+### Simple multi-deployment with environment deactivation
+
+```yml
+on:
+  push:
+    branches:
+    - main
+jobs:
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      ...
+      - name: Notify deployment start
+        uses: maxgfr/multi-deployments@v0.1.11
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
           desc: 'Deploying environment A and environment B'
           env: '["envA", "envB"]'
           debug: true
-      - name: Sleep for 10 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '10s'
+     ...
       - name: Notify deployment deactivation
-        uses: maxgfr/multi-deployments@main
+        uses: maxgfr/multi-deployments@v0.1.11
         with:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
           env: '["envA", "envB"]'
           debug: true
-      - name: Sleep for 10 seconds
-        uses: jakejarvis/wait-action@master
+```
+
+### Simple multi-deployment with environment destruction
+
+```yml
+on:
+  push:
+    branches:
+    - main
+jobs:
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      ...
+      - name: Notify deployment start
+        uses: maxgfr/multi-deployments@v0.1.11
         with:
-          time: '10s'
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          desc: 'Deploying environment A and environment B'
+          env: '["envA", "envB"]'
+          debug: true
+     ...
       - name: Notify deployment delete
-        uses: maxgfr/multi-deployments@main
+        uses: maxgfr/multi-deployments@v0.1.11
         with:
           step: delete-env
           token: ${{ secrets.GH_PAT_TOKEN }} # You muse use a personal access token with repo scope enabled
           env: '["envA", "envB"]'
-          debug: true
-      - name: Sleep for 10 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '10s'
-      - name: Notify deployment start
-        uses: maxgfr/multi-deployments@main
-        id: deployment2
-        with:
-          step: start
-          token: ${{ secrets.GITHUB_TOKEN }}
-          desc: 'Deploying environment C and environment D'
-          env: '["envC", "envD"]'  # you can also use url as environment such as '["https://...."]'
-          debug: true
-      - name: Sleep for 10 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '10s'
-      - name: Notify deployment finish
-        uses: maxgfr/multi-deployments@main
-        with:
-          step: finish
-          status: 'success'
-          token: ${{ secrets.GITHUB_TOKEN }}
-          deployment_id: ${{ steps.deployment2.outputs.deployment_id }}
-          # env_url: '["https://...."]' to bind the environments url to the deployment ids
           debug: true
 ```
 
