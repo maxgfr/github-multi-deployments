@@ -183,14 +183,14 @@ function run(step, context) {
                         }
                         const promises = [];
                         const deactivatePromises = [];
-                        for (const environment of environments) {
-                            deactivatePromises.push((0, deactivate_1.default)(context, environment));
+                        for (const env of environments) {
+                            deactivatePromises.push((0, deactivate_1.default)(context, env));
                             promises.push(github.rest.repos.createDeployment({
                                 owner: context.owner,
                                 repo: context.repo,
                                 ref: args.gitRef,
                                 required_contexts: [],
-                                environment,
+                                environment: env,
                                 auto_merge: false,
                                 description: args.desc,
                                 transient_environment: true
@@ -222,9 +222,7 @@ function run(step, context) {
                         });
                         try {
                             yield Promise.all(secondPromises);
-                            (0, core_1.setOutput)('deployment_id', isMulti
-                                ? JSON.stringify(deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment.data), { deployment_url: environments[index] }))))
-                                : deploymentsData[0].data.id);
+                            (0, core_1.setOutput)('deployment_id', JSON.stringify(deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment.data), { deployment_url: environments[index] })))));
                             (0, core_1.setOutput)('env', args.environment);
                         }
                         catch (e) {
@@ -267,7 +265,12 @@ function run(step, context) {
                             console.log(`finishing deployment for ${args.deployment} with status ${args.status}`);
                         }
                         const newStatus = args.status === 'cancelled' ? 'inactive' : args.status;
-                        const deployments = JSON.parse(args.deployment);
+                        const parseJson = JSON.parse(args.deployment);
+                        let deployments = parseJson;
+                        if (typeof deployments === 'string' ||
+                            typeof deployments === 'number') {
+                            deployments = [{ id: parseJson, deployment_url: '' }];
+                        }
                         if (environmentsUrl &&
                             deployments.length !== environmentsUrl.length) {
                             (0, core_1.error)('deployment_id and env_url must have the same length');

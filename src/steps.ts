@@ -50,15 +50,15 @@ export async function run(
 
           const promises: any = []
           const deactivatePromises: any = []
-          for (const environment of environments) {
-            deactivatePromises.push(deactivateEnvironment(context, environment))
+          for (const env of environments) {
+            deactivatePromises.push(deactivateEnvironment(context, env))
             promises.push(
               github.rest.repos.createDeployment({
                 owner: context.owner,
                 repo: context.repo,
                 ref: args.gitRef,
                 required_contexts: [],
-                environment,
+                environment: env,
                 auto_merge: false,
                 description: args.desc,
                 transient_environment: true
@@ -100,14 +100,12 @@ export async function run(
             await Promise.all(secondPromises)
             setOutput(
               'deployment_id',
-              isMulti
-                ? JSON.stringify(
-                    deploymentsData.map((deployment: any, index: number) => ({
-                      ...deployment.data,
-                      deployment_url: environments[index]
-                    }))
-                  )
-                : deploymentsData[0].data.id
+              JSON.stringify(
+                deploymentsData.map((deployment: any, index: number) => ({
+                  ...deployment.data,
+                  deployment_url: environments[index]
+                }))
+              )
             )
             setOutput('env', args.environment)
           } catch (e) {
@@ -169,8 +167,15 @@ export async function run(
           const newStatus =
             args.status === 'cancelled' ? 'inactive' : args.status
 
-          const deployments: {id: string; deployment_url: string}[] =
-            JSON.parse(args.deployment)
+          const parseJson = JSON.parse(args.deployment)
+          let deployments: {id: string; deployment_url: string}[] = parseJson
+
+          if (
+            typeof deployments === 'string' ||
+            typeof deployments === 'number'
+          ) {
+            deployments = [{id: parseJson, deployment_url: ''}]
+          }
 
           if (
             environmentsUrl &&
