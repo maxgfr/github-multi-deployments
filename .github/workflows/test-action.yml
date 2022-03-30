@@ -94,7 +94,7 @@ jobs:
           env: envZ
           debug: true
       - name: Notify deployment start
-        uses: maxgfr/multi-deployments@v0
+        uses: maxgfr/multi-deployments@v1
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -106,7 +106,7 @@ jobs:
         with:
           time: '10s'
       - name: Notify deployment delete
-        uses: maxgfr/multi-deployments@v0
+        uses: maxgfr/multi-deployments@v1
         with:
           step: delete-env
           token: ${{ secrets.GH_PAT_TOKEN }}
