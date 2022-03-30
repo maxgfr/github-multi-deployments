@@ -93,3 +93,23 @@ jobs:
           token: ${{ secrets.GH_PAT_TOKEN }}
           env: '["envX"]'
           debug: true
+      - name: Notify deployment start
+        uses: ./
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          description: 'Deploying environmentX'
+          env: envZ
+          debug: true
+      - name: Sleep for 10 seconds
+        uses: jakejarvis/wait-action@master
+        with:
+          time: '10s'
+      - name: Notify deployment deactivation
+        uses: ./
+        with:
+          step: deactivate-env
+          token: ${{ secrets.GITHUB_TOKEN }}
+          env: envZ
+          debug: true
+
