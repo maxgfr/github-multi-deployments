@@ -79,7 +79,7 @@ jobs:
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          description: 'Deploying environmentX'
+          description: 'Deploying environment Z'
           env: envZ
           debug: true
       - name: Sleep for 10 seconds
@@ -98,7 +98,7 @@ jobs:
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          description: 'Deploying environmentX'
+          description: 'Deploying environment X'
           env: '["envX"]'
           debug: true
       - name: Sleep for 10 seconds
