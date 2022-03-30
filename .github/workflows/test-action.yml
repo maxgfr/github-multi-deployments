@@ -80,25 +80,6 @@ jobs:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
           description: 'Deploying environmentX'
-          env: '["envX"]'
-          debug: true
-      - name: Sleep for 10 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '10s'
-      - name: Notify deployment delete
-        uses: ./
-        with:
-          step: delete-env
-          token: ${{ secrets.GH_PAT_TOKEN }}
-          env: '["envX"]'
-          debug: true
-      - name: Notify deployment start
-        uses: ./
-        with:
-          step: start
-          token: ${{ secrets.GITHUB_TOKEN }}
-          description: 'Deploying environmentX'
           env: envZ
           debug: true
       - name: Sleep for 10 seconds
@@ -111,5 +92,24 @@ jobs:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
           env: envZ
+          debug: true
+      - name: Notify deployment start
+        uses: maxgfr/multi-deployments@v0
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          description: 'Deploying environmentX'
+          env: '["envX"]'
+          debug: true
+      - name: Sleep for 10 seconds
+        uses: jakejarvis/wait-action@master
+        with:
+          time: '10s'
+      - name: Notify deployment delete
+        uses: maxgfr/multi-deployments@v0
+        with:
+          step: delete-env
+          token: ${{ secrets.GH_PAT_TOKEN }}
+          env: '["envX"]'
           debug: true
 
