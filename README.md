@@ -19,7 +19,7 @@ jobs:
     steps:
       ...
       - name: Notify deployment start
-        uses: maxgfr/multi-deployments@v1.0.0
+        uses: maxgfr/multi-deployments@v1.1.0
         id: deployment
         with:
           step: start
@@ -29,7 +29,7 @@ jobs:
           debug: true
       ...
       - name: Notify deployment finish
-        uses: maxgfr/multi-deployments@v1.0.0
+        uses: maxgfr/multi-deployments@v1.1.0
         with:
           step: finish
           status: 'success'
@@ -52,7 +52,7 @@ jobs:
     steps:
       ...
       - name: Notify deployment start
-        uses: maxgfr/multi-deployments@v1.0.0
+        uses: maxgfr/multi-deployments@v1.1.0
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -61,7 +61,7 @@ jobs:
           debug: true
      ...
       - name: Notify deployment deactivation
-        uses: maxgfr/multi-deployments@v1.0.0
+        uses: maxgfr/multi-deployments@v1.1.0
         with:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -82,7 +82,7 @@ jobs:
     steps:
       ...
       - name: Notify deployment start
-        uses: maxgfr/multi-deployments@v1.0.0
+        uses: maxgfr/multi-deployments@v1.1.0
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -91,7 +91,7 @@ jobs:
           debug: true
      ...
       - name: Notify deployment delete
-        uses: maxgfr/multi-deployments@v1.0.0
+        uses: maxgfr/multi-deployments@v1.1.0
         with:
           step: delete-env
           token: ${{ secrets.GH_PAT_TOKEN }} # You muse use a personal access token with repo scope enabled

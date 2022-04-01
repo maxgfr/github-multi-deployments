@@ -32,15 +32,12 @@ export async function run(
 
           let environments: any
 
-          const isMulti = args.environment.split(',').length > 1
-
-          if (args.isDebug) {
-            console.log(`Is a multi environment : ${isMulti}`)
-          }
-
-          if (isMulti) {
+          try {
             environments = JSON.parse(args.environment)
-          } else {
+            if (!environments.length) {
+              environments = [args.environment]
+            }
+          } catch {
             environments = [args.environment]
           }
 
@@ -131,15 +128,12 @@ export async function run(
           let environmentsUrl: any
 
           if (args.envURL) {
-            const isMulti = args.envURL.split(',').length > 1
-
-            if (args.isDebug) {
-              console.log(`Is a multi environment : ${isMulti}`)
-            }
-
-            if (isMulti) {
+            try {
               environmentsUrl = JSON.parse(args.envURL)
-            } else {
+              if (!environmentsUrl.length) {
+                environmentsUrl = [args.envURL]
+              }
+            } catch {
               environmentsUrl = [args.envURL]
             }
           }
@@ -262,11 +256,12 @@ export async function run(
 
           let environments: any
 
-          const isMulti = args.environment.split(',').length > 1
-
-          if (isMulti) {
+          try {
             environments = JSON.parse(args.environment)
-          } else {
+            if (!environments.length) {
+              environments = [args.environment]
+            }
+          } catch {
             environments = [args.environment]
           }
 
