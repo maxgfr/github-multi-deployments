@@ -168,14 +168,13 @@ function run(step, context) {
                             console.log(`'${step}' arguments`, args);
                         }
                         let environments;
-                        const isMulti = args.environment.split(',').length > 1;
-                        if (args.isDebug) {
-                            console.log(`Is a multi environment : ${isMulti}`);
-                        }
-                        if (isMulti) {
+                        try {
                             environments = JSON.parse(args.environment);
+                            if (!environments.length) {
+                                environments = [args.environment];
+                            }
                         }
-                        else {
+                        catch (_a) {
                             environments = [args.environment];
                         }
                         if (args.isDebug) {
@@ -201,7 +200,7 @@ function run(step, context) {
                             yield Promise.all(deactivatePromises);
                             deploymentsData = yield Promise.all(promises);
                         }
-                        catch (_a) {
+                        catch (_b) {
                             (0, core_1.error)('Cannot generate deployments');
                         }
                         if (args.isDebug) {
@@ -239,14 +238,13 @@ function run(step, context) {
                         }
                         let environmentsUrl;
                         if (args.envURL) {
-                            const isMulti = args.envURL.split(',').length > 1;
-                            if (args.isDebug) {
-                                console.log(`Is a multi environment : ${isMulti}`);
-                            }
-                            if (isMulti) {
+                            try {
                                 environmentsUrl = JSON.parse(args.envURL);
+                                if (!environmentsUrl.length) {
+                                    environmentsUrl = [args.envURL];
+                                }
                             }
-                            else {
+                            catch (_c) {
                                 environmentsUrl = [args.envURL];
                             }
                         }
@@ -336,11 +334,13 @@ function run(step, context) {
                             console.log(`'${step}' arguments`, args);
                         }
                         let environments;
-                        const isMulti = args.environment.split(',').length > 1;
-                        if (isMulti) {
+                        try {
                             environments = JSON.parse(args.environment);
+                            if (!environments.length) {
+                                environments = [args.environment];
+                            }
                         }
-                        else {
+                        catch (_d) {
                             environments = [args.environment];
                         }
                         const promises = [];
