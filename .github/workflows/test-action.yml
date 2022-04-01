@@ -20,7 +20,7 @@ jobs:
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          description: 'Deploying environment A and environment B'
+          desc: 'Deploying environment A and environment B'
           env: '["envA", "envB"]'
           debug: true
       - name: Sleep for 10 seconds
@@ -55,7 +55,7 @@ jobs:
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          description: 'Deploying environment C and environment D'
+          desc: 'Deploying environment C and environment D'
           env: '["envC", "envD"]'
           debug: true
       - name: Sleep for 10 seconds
@@ -79,7 +79,7 @@ jobs:
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          description: 'Deploying environment Z'
+          desc: 'Deploying environment Z'
           env: envZ
           debug: true
       - name: Sleep for 10 seconds
@@ -94,11 +94,11 @@ jobs:
           env: envZ
           debug: true
       - name: Notify deployment start
-        uses: maxgfr/multi-deployments@v1.1.1
+        uses: maxgfr/multi-deployments@v1.2.0
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          description: 'Deploying environment X'
+          desc: 'Deploying environment X'
           env: '["envX"]'
           debug: true
       - name: Sleep for 10 seconds
@@ -106,7 +106,7 @@ jobs:
         with:
           time: '10s'
       - name: Notify deployment delete
-        uses: maxgfr/multi-deployments@v1.1.1
+        uses: maxgfr/multi-deployments@v1.2.0
         with:
           step: delete-env
           token: ${{ secrets.GH_PAT_TOKEN }}

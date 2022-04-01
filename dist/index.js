@@ -307,11 +307,13 @@ function run(step, context) {
                             console.log(`'${step}' arguments`, args);
                         }
                         let environments;
-                        const isMulti = args.environment.split(',').length > 1;
-                        if (isMulti) {
+                        try {
                             environments = JSON.parse(args.environment);
+                            if (!environments.length) {
+                                environments = [args.environment];
+                            }
                         }
-                        else {
+                        catch (_d) {
                             environments = [args.environment];
                         }
                         const promises = [];
@@ -340,7 +342,7 @@ function run(step, context) {
                                 environments = [args.environment];
                             }
                         }
-                        catch (_d) {
+                        catch (_e) {
                             environments = [args.environment];
                         }
                         const promises = [];

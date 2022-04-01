@@ -220,11 +220,12 @@ export async function run(
 
           let environments: any
 
-          const isMulti = args.environment.split(',').length > 1
-
-          if (isMulti) {
+          try {
             environments = JSON.parse(args.environment)
-          } else {
+            if (!environments.length) {
+              environments = [args.environment]
+            }
+          } catch {
             environments = [args.environment]
           }
 
