@@ -109,6 +109,8 @@ function getEnvByRef({ github: client, owner, repo }, ref) {
             repo,
             ref
         });
+        console.log('Deployments data');
+        console.log(deployments.data);
         const envs = deployments.data.map(dep => dep.environment);
         return [...new Set(envs)]; // to remove duplicates
     });
