@@ -95,6 +95,7 @@ jobs:
           debug: true
       - name: Notify deployment start
         uses: maxgfr/multi-deployments@v1.2.0
+        id: deployment3
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -111,6 +112,7 @@ jobs:
           step: finish
           status: 'success'
           token: ${{ secrets.GITHUB_TOKEN }}
+          deployment_id: ${{ steps.deployment3.outputs.deployment_id }}
           env_url: '["envX"]'
           debug: true
       - name: Sleep for 5 seconds
