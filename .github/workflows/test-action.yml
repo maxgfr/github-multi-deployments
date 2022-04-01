@@ -107,11 +107,11 @@ jobs:
         uses: jakejarvis/wait-action@master
         with:
           time: '5s'
-      - name: Notify deployment delete
+      - name: Notify deployment deactivation
         uses: ./
         with:
-          step: delete-env
-          token: ${{ secrets.GH_PAT_TOKEN }}
+          step: deactivate-env
+          token: ${{ secrets.GITHUB_TOKEN }}
           env: ${{ steps.envs.outputs.env }}
           debug: true
 
