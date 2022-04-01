@@ -109,7 +109,8 @@ function getEnvByRef({ github: client, owner, repo }, ref) {
             repo,
             ref
         });
-        return deployments.data.map(dep => dep.environment);
+        const envs = deployments.data.map(dep => dep.environment);
+        return [...new Set(envs)]; // to remove duplicates
     });
 }
 exports["default"] = getEnvByRef;
@@ -399,10 +400,6 @@ function run(step, context) {
                         const args = Object.assign(Object.assign({}, context.coreArgs), { gitRef: (0, core_1.getInput)('ref') || context.ref });
                         if (args.isDebug) {
                             console.log(`'${step}' arguments`, args);
-                        }
-                        let environments;
-                        if (args.isDebug) {
-                            console.log(`Environment(s) : ${environments}`);
                         }
                         const env = yield (0, get_env_1.default)(context, args.gitRef);
                         if (args.isDebug) {

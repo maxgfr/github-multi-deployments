@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - 'releases/*'
 
 jobs:
   action:
@@ -20,8 +19,8 @@ jobs:
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          desc: 'Deploying environment A and environment B'
-          env: '["envA", "envB"]'
+          desc: 'Deploying environment X'
+          env: '["envX"]'
           debug: true
       - name: Sleep for 5 seconds
         uses: jakejarvis/wait-action@master
@@ -32,7 +31,7 @@ jobs:
         with:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
-          env: '["envA", "envB"]'
+          env: '["envX"]'
           debug: true
       - name: Sleep for 5 seconds
         uses: jakejarvis/wait-action@master
@@ -43,7 +42,7 @@ jobs:
         with:
           step: delete-env
           token: ${{ secrets.GH_PAT_TOKEN }}
-          env: '["envA", "envB"]'
+          env: '["envX"]'
           debug: true
       - name: Sleep for 5 seconds
         uses: jakejarvis/wait-action@master
@@ -86,8 +85,20 @@ jobs:
         uses: jakejarvis/wait-action@master
         with:
           time: '5s'
+      - name: Notify deployment deactivation
+        uses: ./
+        with:
+          step: deactivate-env
+          token: ${{ secrets.GITHUB_TOKEN }}
+          env: envZ
+          debug: true
+      - name: Sleep for 5 seconds
+        uses: jakejarvis/wait-action@master
+        with:
+          time: '5s'
       - name: Notify get env
         uses: ./
+        id: envs
         with:
           step: get-env
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -96,44 +107,11 @@ jobs:
         uses: jakejarvis/wait-action@master
         with:
           time: '5s'
-      - name: Notify deployment deactivation
-        uses: ./
-        with:
-          step: deactivate-env
-          token: ${{ secrets.GITHUB_TOKEN }}
-          env: envZ
-          debug: true
-      - name: Notify deployment start
-        uses: maxgfr/multi-deployments@v1.2.0
-        id: deployment3
-        with:
-          step: start
-          token: ${{ secrets.GITHUB_TOKEN }}
-          desc: 'Deploying environment X'
-          env: '["envX"]'
-          debug: true
-      - name: Sleep for 5 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '5s'
-      - name: Notify deployment finish
-        uses: maxgfr/multi-deployments@v1.2.0
-        with:
-          step: finish
-          status: 'success'
-          token: ${{ secrets.GITHUB_TOKEN }}
-          deployment_id: ${{ steps.deployment3.outputs.deployment_id }}
-          env_url: '["envX"]'
-          debug: true
-      - name: Sleep for 5 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '5s'
       - name: Notify deployment delete
-        uses: maxgfr/multi-deployments@v1.2.0
+        uses: ./
         with:
           step: delete-env
           token: ${{ secrets.GH_PAT_TOKEN }}
-          env: '["envX"]'
+          env: ${{ steps.envs.outputs.env }}
           debug: true
 

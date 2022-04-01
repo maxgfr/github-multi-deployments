@@ -9,7 +9,8 @@ async function getEnvByRef(
     repo,
     ref
   })
-  return deployments.data.map(dep => dep.environment)
+  const envs = deployments.data.map(dep => dep.environment)
+  return [...new Set(envs)] // to remove duplicates
 }
 
 export default getEnvByRef

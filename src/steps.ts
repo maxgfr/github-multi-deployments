@@ -300,12 +300,6 @@ export async function run(
             console.log(`'${step}' arguments`, args)
           }
 
-          let environments: any
-
-          if (args.isDebug) {
-            console.log(`Environment(s) : ${environments}`)
-          }
-
           const env = await getEnvByRef(context, args.gitRef)
 
           if (args.isDebug) {
