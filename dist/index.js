@@ -87,6 +87,36 @@ exports["default"] = deactivateEnvironment;
 
 /***/ }),
 
+/***/ 3215:
+/***/ (function(__unused_webpack_module, exports) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+function getEnvByRef({ github: client, owner, repo }, ref) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const deployments = yield client.rest.repos.listDeployments({
+            owner,
+            repo,
+            ref
+        });
+        return deployments.data.map(dep => dep.environment);
+    });
+}
+exports["default"] = getEnvByRef;
+
+
+/***/ }),
+
 /***/ 3109:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -148,6 +178,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = exports.Step = void 0;
 const core_1 = __nccwpck_require__(2186);
 const deactivate_1 = __importDefault(__nccwpck_require__(3562));
+const get_env_1 = __importDefault(__nccwpck_require__(3215));
 const url_1 = __nccwpck_require__(8615);
 var Step;
 (function (Step) {
@@ -155,6 +186,7 @@ var Step;
     Step["Finish"] = "finish";
     Step["DeactivateEnv"] = "deactivate-env";
     Step["DeleteEnv"] = "delete-env";
+    Step["GetEnv"] = "get-env";
 })(Step = exports.Step || (exports.Step = {}));
 function run(step, context) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -359,6 +391,30 @@ function run(step, context) {
                         catch (e) {
                             console.log(e);
                             (0, core_1.error)('Cannot delete env');
+                        }
+                    }
+                    break;
+                case Step.GetEnv:
+                    {
+                        const args = Object.assign(Object.assign({}, context.coreArgs), { gitRef: (0, core_1.getInput)('ref') || context.ref });
+                        if (args.isDebug) {
+                            console.log(`'${step}' arguments`, args);
+                        }
+                        let environments;
+                        if (args.isDebug) {
+                            console.log(`Environment(s) : ${environments}`);
+                        }
+                        const env = yield (0, get_env_1.default)(context, args.gitRef);
+                        if (args.isDebug) {
+                            console.log(`Deployment by environment for ${args.gitRef} branch :`);
+                            console.log(env);
+                        }
+                        try {
+                            (0, core_1.setOutput)('env', env);
+                        }
+                        catch (e) {
+                            console.log(e);
+                            (0, core_1.error)('Cannot generate deployment status');
                         }
                     }
                     break;

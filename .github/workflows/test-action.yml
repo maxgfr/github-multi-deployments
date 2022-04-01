@@ -86,6 +86,16 @@ jobs:
         uses: jakejarvis/wait-action@master
         with:
           time: '5s'
+      - name: Notify get env
+        uses: ./
+        with:
+          step: get-env
+          token: ${{ secrets.GITHUB_TOKEN }}
+          debug: true
+      - name: Sleep for 5 seconds
+        uses: jakejarvis/wait-action@master
+        with:
+          time: '5s'
       - name: Notify deployment deactivation
         uses: ./
         with:

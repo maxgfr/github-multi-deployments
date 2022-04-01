@@ -1,13 +1,15 @@
 import {getInput, setOutput, error, setFailed} from '@actions/core'
 import {DeploymentContext} from './context'
 import deactivateEnvironment from './deactivate'
+import getEnvByRef from './get-env'
 import {isValidUrl} from './url'
 
 export enum Step {
   Start = 'start',
   Finish = 'finish',
   DeactivateEnv = 'deactivate-env',
-  DeleteEnv = 'delete-env'
+  DeleteEnv = 'delete-env',
+  GetEnv = 'get-env'
 }
 
 export async function run(
@@ -283,6 +285,39 @@ export async function run(
           } catch (e) {
             console.log(e)
             error('Cannot delete env')
+          }
+        }
+        break
+
+      case Step.GetEnv:
+        {
+          const args = {
+            ...context.coreArgs,
+            gitRef: getInput('ref') || context.ref
+          }
+
+          if (args.isDebug) {
+            console.log(`'${step}' arguments`, args)
+          }
+
+          let environments: any
+
+          if (args.isDebug) {
+            console.log(`Environment(s) : ${environments}`)
+          }
+
+          const env = await getEnvByRef(context, args.gitRef)
+
+          if (args.isDebug) {
+            console.log(`Deployment by environment for ${args.gitRef} branch :`)
+            console.log(env)
+          }
+
+          try {
+            setOutput('env', env)
+          } catch (e) {
+            console.log(e)
+            error('Cannot generate deployment status')
           }
         }
         break
