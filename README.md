@@ -1,4 +1,4 @@
-# GitHub Multi Deployments [![View Action](https://img.shields.io/badge/view-github%20action-yellow.svg)](https://github.com/marketplace/actions/github-multi-deployments) [![pipeline](https://img.shields.io/github/workflow/status/maxgfr/multi-deployments/build-test)](https://github.com/maxgfr/multi-deployments/actions/workflows/build.yaml)
+# GitHub Multi Deployments [![View Action](https://img.shields.io/badge/view-github%20action-yellow.svg)](https://github.com/marketplace/actions/github-multi-deployments) [![pipeline](https://img.shields.io/github/workflow/status/maxgfr/multi-deployments/build-test)](https://github.com/maxgfr/multi-deployments/actions/workflows/test-build.yml)
 
 `maxgfr/multi-deployments` is a [GitHub Action](https://github.com/features/actions) which enables you to deploy multiple environments in a single workflow.
 
