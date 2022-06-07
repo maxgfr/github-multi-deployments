@@ -1,6 +1,6 @@
-# GitHub Multi Deployments [![View Action](https://img.shields.io/badge/view-github%20action-yellow.svg)](https://github.com/marketplace/actions/github-multi-deployments) [![pipeline](https://img.shields.io/github/workflow/status/maxgfr/multi-deployments/build-test)](https://github.com/maxgfr/multi-deployments/actions/workflows/test-build.yml)
+# GitHub Multi Deployments [![View Action](https://img.shields.io/badge/view-github%20action-yellow.svg)](https://github.com/marketplace/actions/github-multi-deployments) [![pipeline](https://img.shields.io/github/workflow/status/maxgfr/github-multi-deployments/build-test)](https://github.com/maxgfr/github-multi-deployments/actions/workflows/test-build.yml)
 
-`maxgfr/multi-deployments` is a [GitHub Action](https://github.com/features/actions) which enables you to deploy multiple environments in a single workflow.
+`maxgfr/github-multi-deployments` is a [GitHub Action](https://github.com/features/actions) which enables you to deploy multiple environments in a single workflow.
 
 This action is a fork of [`bobheadxi/deployments`](https://github.com/marketplace/actions/github-deployments). Thus, before dig into this action, you may check [bobheadxi documentation](https://github.com/bobheadxi/deployments).
 
@@ -19,7 +19,7 @@ jobs:
     steps:
       ...
       - name: Notify deployment start
-        uses: maxgfr/multi-deployments@v1.3.2
+        uses: maxgfr/github-multi-deployments@v1.3.2
         id: deployment
         with:
           step: start
@@ -29,7 +29,7 @@ jobs:
           debug: true
       ...
       - name: Notify deployment finish
-        uses: maxgfr/multi-deployments@v1.3.2
+        uses: maxgfr/github-multi-deployments@v1.3.2
         with:
           step: finish
           status: 'success'
@@ -52,7 +52,7 @@ jobs:
     steps:
       ...
       - name: Notify deployment start
-        uses: maxgfr/multi-deployments@v1.3.2
+        uses: maxgfr/github-multi-deployments@v1.3.2
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -61,7 +61,7 @@ jobs:
           debug: true
      ...
       - name: Notify deployment deactivation
-        uses: maxgfr/multi-deployments@v1.3.2
+        uses: maxgfr/github-multi-deployments@v1.3.2
         with:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -82,7 +82,7 @@ jobs:
     steps:
       ...
       - name: Notify deployment start
-        uses: maxgfr/multi-deployments@v1.3.2
+        uses: maxgfr/github-multi-deployments@v1.3.2
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -91,7 +91,7 @@ jobs:
           debug: true
      ...
       - name: Notify deployment delete
-        uses: maxgfr/multi-deployments@v1.3.2
+        uses: maxgfr/github-multi-deployments@v1.3.2
         with:
           step: delete-env
           token: ${{ secrets.GH_PAT_TOKEN }} # You muse use a personal access token with repo scope enabled
@@ -112,7 +112,7 @@ jobs:
     steps:
      ...
       - name: Get a list of environments
-        uses: maxgfr/multi-deployments@v1.3.2
+        uses: maxgfr/github-multi-deployments@v1.3.2
         id: envs
         with:
           step: get-env
