@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Notify deployment start
-        uses: maxgfr/github-multi-deployments@v1.3.2
+        uses: maxgfr/github-multi-deployments@v1.4.6
         id: deployment
         with:
           step: start
@@ -20,7 +20,7 @@ jobs:
           debug: true
 
       - name: Notify deployment finish
-        uses: maxgfr/github-multi-deployments@v1.3.2
+        uses: maxgfr/github-multi-deployments@v1.4.6
         with:
           step: finish
           status: 'success'
