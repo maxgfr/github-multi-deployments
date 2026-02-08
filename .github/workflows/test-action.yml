@@ -1,4 +1,5 @@
 name: 'action-test'
+
 on:
   pull_request:
   push:
@@ -9,11 +10,24 @@ jobs:
   action:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Sleep for 5 seconds
-        uses: jakejarvis/wait-action@master
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
         with:
-          time: '5s'
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and package
+        run: pnpm run build && pnpm run package
+
       - name: Notify deployment start
         uses: ./
         with:
@@ -22,10 +36,7 @@ jobs:
           desc: 'Deploying environment X'
           env: '["envX"]'
           debug: true
-      - name: Sleep for 5 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '5s'
+
       - name: Notify deployment deactivation
         uses: ./
         with:
@@ -33,10 +44,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           env: '["envX"]'
           debug: true
-      - name: Sleep for 5 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '5s'
+
       - name: Notify deployment delete
         uses: ./
         with:
@@ -44,11 +52,8 @@ jobs:
           token: ${{ secrets.GH_PAT_TOKEN }}
           env: '["envX"]'
           debug: true
-      - name: Sleep for 5 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '5s'
-      - name: Notify deployment start
+
+      - name: Notify deployment start (multiple)
         uses: ./
         id: deployment2
         with:
@@ -57,10 +62,7 @@ jobs:
           desc: 'Deploying environment C and environment D'
           env: '["envC", "envD"]'
           debug: true
-      - name: Sleep for 5 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '5s'
+
       - name: Notify deployment finish
         uses: ./
         with:
@@ -69,11 +71,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           deployment_id: ${{ steps.deployment2.outputs.deployment_id }}
           debug: true
-      - name: Sleep for 5 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '5s'
-      - name: Notify deployment start
+
+      - name: Notify deployment start (single string)
         uses: ./
         with:
           step: start
@@ -81,21 +80,15 @@ jobs:
           desc: 'Deploying environment Z'
           env: envZ
           debug: true
-      - name: Sleep for 5 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '5s'
-      - name: Notify deployment deactivation
+
+      - name: Notify deployment deactivation (single string)
         uses: ./
         with:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
           env: envZ
           debug: true
-      - name: Sleep for 5 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '5s'
+
       - name: Notify get env
         uses: ./
         id: envs
@@ -103,15 +96,11 @@ jobs:
           step: get-env
           token: ${{ secrets.GITHUB_TOKEN }}
           debug: true
-      - name: Sleep for 5 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: '5s'
-      - name: Notify deployment deactivation
+
+      - name: Notify deployment deactivation (dynamic)
         uses: ./
         with:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
           env: ${{ steps.envs.outputs.env }}
           debug: true
-
