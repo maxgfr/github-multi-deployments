@@ -1,4 +1,5 @@
 name: 'action-test-remote'
+
 on:
   pull_request:
   push:
@@ -9,21 +10,31 @@ jobs:
   action:
     runs-on: ubuntu-latest
     steps:
-      - name: Notify deployment start
-        uses: maxgfr/github-multi-deployments@v1.3.2
+      - name: 'Test: start deployment'
+        uses: maxgfr/github-multi-deployments@main
         id: deployment
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          desc: 'Deploying remote environment'
-          env: '["envRemote"]'
+          desc: Deploying remote environment
+          env: env-remote-${{ github.run_id }}
+          auto_inactive: 'true'
           debug: true
 
-      - name: Notify deployment finish
-        uses: maxgfr/github-multi-deployments@v1.3.2
+      - name: 'Test: finish deployment'
+        uses: maxgfr/github-multi-deployments@main
         with:
           step: finish
-          status: 'success'
           token: ${{ secrets.GITHUB_TOKEN }}
+          status: success
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
           debug: true
+
+      - name: Cleanup
+        if: always()
+        continue-on-error: true
+        uses: maxgfr/github-multi-deployments@main
+        with:
+          step: deactivate-env
+          token: ${{ secrets.GITHUB_TOKEN }}
+          env: env-remote-${{ github.run_id }}

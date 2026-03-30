@@ -428,6 +428,16 @@ function run(step, context) {
                         }));
                         (0, core_1.setOutput)('deployment_id', JSON.stringify(mockOutput));
                         (0, core_1.setOutput)('env', args.environment);
+                        yield core_1.summary
+                            .addHeading('[Dry Run] Deployment Started', 3)
+                            .addTable([
+                            [
+                                { data: 'Environment', header: true },
+                                { data: 'ID', header: true }
+                            ],
+                            ...environments.map((env, i) => [env, `dry-run-${i}`])
+                        ])
+                            .write();
                         break;
                     }
                     // Deactivate existing deployments unless auto_inactive is enabled
@@ -472,6 +482,22 @@ function run(step, context) {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment.data), { deployment_url: environments[index] })))));
                     (0, core_1.setOutput)('env', args.environment);
+                    yield core_1.summary
+                        .addHeading('Deployment Started', 3)
+                        .addTable([
+                        [
+                            { data: 'Environment', header: true },
+                            { data: 'ID', header: true },
+                            { data: 'Ref', header: true }
+                        ],
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        ...deploymentsData.map((d, i) => [
+                            environments[i],
+                            String(d.data.id),
+                            args.gitRef
+                        ])
+                    ])
+                        .write();
                     break;
                 }
                 case Step.Finish: {
@@ -506,6 +532,16 @@ function run(step, context) {
                     if (args.dryRun) {
                         console.log(`[dry-run] would set status "${newStatus}" for ${deployments.length} deployment(s)`);
                         (0, core_1.setOutput)('deployment_id', JSON.stringify(deployments.map(dep => ({ id: dep.id, status: newStatus }))));
+                        yield core_1.summary
+                            .addHeading(`[Dry Run] Deployment Finished (${newStatus})`, 3)
+                            .addTable([
+                            [
+                                { data: 'ID', header: true },
+                                { data: 'Status', header: true }
+                            ],
+                            ...deployments.map(dep => [dep.id, newStatus])
+                        ])
+                            .write();
                         break;
                     }
                     const results = yield Promise.allSettled(deployments.map((dep, i) => (0, retry_1.withRetry)(() => github.rest.repos.createDeploymentStatus({
@@ -523,6 +559,21 @@ function run(step, context) {
                     }))));
                     reportSettledResults(results, 'Update deployment statuses');
                     (0, core_1.setOutput)('deployment_id', JSON.stringify(deployments.map(dep => ({ id: dep.id, status: newStatus }))));
+                    yield core_1.summary
+                        .addHeading(`Deployment Finished (${newStatus})`, 3)
+                        .addTable([
+                        [
+                            { data: 'ID', header: true },
+                            { data: 'Status', header: true },
+                            { data: 'URL', header: true }
+                        ],
+                        ...deployments.map((dep, i) => [
+                            dep.id,
+                            newStatus,
+                            (environmentsUrl === null || environmentsUrl === void 0 ? void 0 : environmentsUrl[i]) || '-'
+                        ])
+                    ])
+                        .write();
                     break;
                 }
                 case Step.DeactivateEnv: {
@@ -533,10 +584,18 @@ function run(step, context) {
                     const environments = parseArrayOrString(args.environment);
                     if (args.dryRun) {
                         console.log(`[dry-run] would deactivate environments: ${environments.join(', ')}`);
+                        yield core_1.summary
+                            .addHeading('[Dry Run] Environments Deactivated', 3)
+                            .addRaw(environments.join(', '))
+                            .write();
                         break;
                     }
                     const results = yield Promise.allSettled(environments.map(env => (0, deactivate_1.default)(context, env)));
                     reportSettledResults(results, 'Deactivate environments');
+                    yield core_1.summary
+                        .addHeading('Environments Deactivated', 3)
+                        .addRaw(environments.join(', '))
+                        .write();
                     break;
                 }
                 case Step.DeleteEnv: {
@@ -547,14 +606,22 @@ function run(step, context) {
                     const environments = parseArrayOrString(args.environment);
                     if (args.dryRun) {
                         console.log(`[dry-run] would delete environments: ${environments.join(', ')}`);
+                        yield core_1.summary
+                            .addHeading('[Dry Run] Environments Deleted', 3)
+                            .addRaw(environments.join(', '))
+                            .write();
                         break;
                     }
-                    const results = yield Promise.allSettled(environments.map(env => (0, retry_1.withRetry)(() => github.rest.repos.deleteAnEnvironment({
+                    const deleteResults = yield Promise.allSettled(environments.map(env => (0, retry_1.withRetry)(() => github.rest.repos.deleteAnEnvironment({
                         owner: context.owner,
                         repo: context.repo,
                         environment_name: env
                     }))));
-                    reportSettledResults(results, 'Delete environments');
+                    reportSettledResults(deleteResults, 'Delete environments');
+                    yield core_1.summary
+                        .addHeading('Environments Deleted', 3)
+                        .addRaw(environments.join(', '))
+                        .write();
                     break;
                 }
                 case Step.GetEnv: {
@@ -568,6 +635,12 @@ function run(step, context) {
                         console.log(env);
                     }
                     (0, core_1.setOutput)('env', JSON.stringify(env));
+                    yield core_1.summary
+                        .addHeading('Environments Found', 3)
+                        .addRaw(env.length > 0
+                        ? env.join(', ')
+                        : `No environments found for ref \`${args.gitRef}\``)
+                        .write();
                     break;
                 }
                 default:

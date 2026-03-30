@@ -1,10 +1,18 @@
 /// <reference types="@types/jest" />
 
+const mockSummary = {
+  addHeading: jest.fn().mockReturnThis(),
+  addTable: jest.fn().mockReturnThis(),
+  addRaw: jest.fn().mockReturnThis(),
+  write: jest.fn().mockResolvedValue(undefined)
+}
+
 jest.mock('@actions/core', () => ({
   getInput: jest.fn(),
   setOutput: jest.fn(),
   error: jest.fn(),
-  setFailed: jest.fn()
+  setFailed: jest.fn(),
+  summary: mockSummary
 }))
 
 jest.mock('./deactivate', () => ({
@@ -395,6 +403,34 @@ describe('steps', () => {
       expect(mockSetOutput).toHaveBeenCalledWith('env', 'staging')
     })
 
+    it('should write job summary', async () => {
+      const mockGithub = createMockGithub()
+      const context = createMockContext({github: mockGithub})
+      mockInputs({env: 'staging', ref: 'main'})
+
+      await run(Step.Start, context)
+
+      expect(mockSummary.addHeading).toHaveBeenCalledWith(
+        'Deployment Started',
+        3
+      )
+      expect(mockSummary.addTable).toHaveBeenCalled()
+      expect(mockSummary.write).toHaveBeenCalled()
+    })
+
+    it('should write dry-run job summary', async () => {
+      const context = createMockContext({coreArgs: {dryRun: true}})
+      mockInputs({env: '["a", "b"]', ref: 'main'})
+
+      await run(Step.Start, context)
+
+      expect(mockSummary.addHeading).toHaveBeenCalledWith(
+        '[Dry Run] Deployment Started',
+        3
+      )
+      expect(mockSummary.write).toHaveBeenCalled()
+    })
+
     it('should fail when status creation fails', async () => {
       const mockGithub = createMockGithub()
       mockGithub.rest.repos.createDeploymentStatus.mockRejectedValue(
@@ -641,6 +677,26 @@ describe('steps', () => {
       await run(Step.Finish, context)
 
       expect(mockSetFailed).toHaveBeenCalled()
+    })
+
+    it('should write job summary with status and URLs', async () => {
+      const mockGithub = createMockGithub()
+      const context = createMockContext({github: mockGithub})
+
+      mockInputs({
+        status: 'success',
+        deployment_id: JSON.stringify([{id: '1', deployment_url: ''}]),
+        env_url: 'https://example.com'
+      })
+
+      await run(Step.Finish, context)
+
+      expect(mockSummary.addHeading).toHaveBeenCalledWith(
+        'Deployment Finished (success)',
+        3
+      )
+      expect(mockSummary.addTable).toHaveBeenCalled()
+      expect(mockSummary.write).toHaveBeenCalled()
     })
 
     it('should reject invalid env_url values', async () => {

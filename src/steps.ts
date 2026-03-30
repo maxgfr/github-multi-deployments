@@ -1,4 +1,4 @@
-import {getInput, setOutput, error, setFailed} from '@actions/core'
+import {getInput, setOutput, error, setFailed, summary} from '@actions/core'
 import {DeploymentContext} from './context'
 import deactivateEnvironment from './deactivate'
 import getEnvByRef from './get-env'
@@ -152,6 +152,16 @@ export async function run(
           }))
           setOutput('deployment_id', JSON.stringify(mockOutput))
           setOutput('env', args.environment)
+          await summary
+            .addHeading('[Dry Run] Deployment Started', 3)
+            .addTable([
+              [
+                {data: 'Environment', header: true},
+                {data: 'ID', header: true}
+              ],
+              ...environments.map((env, i) => [env, `dry-run-${i}`])
+            ])
+            .write()
           break
         }
 
@@ -240,6 +250,22 @@ export async function run(
           )
         )
         setOutput('env', args.environment)
+        await summary
+          .addHeading('Deployment Started', 3)
+          .addTable([
+            [
+              {data: 'Environment', header: true},
+              {data: 'ID', header: true},
+              {data: 'Ref', header: true}
+            ],
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ...deploymentsData.map((d: any, i: number) => [
+              environments[i],
+              String(d.data.id),
+              args.gitRef
+            ])
+          ])
+          .write()
         break
       }
 
@@ -303,6 +329,16 @@ export async function run(
               deployments.map(dep => ({id: dep.id, status: newStatus}))
             )
           )
+          await summary
+            .addHeading(`[Dry Run] Deployment Finished (${newStatus})`, 3)
+            .addTable([
+              [
+                {data: 'ID', header: true},
+                {data: 'Status', header: true}
+              ],
+              ...deployments.map(dep => [dep.id, newStatus])
+            ])
+            .write()
           break
         }
 
@@ -335,6 +371,21 @@ export async function run(
             deployments.map(dep => ({id: dep.id, status: newStatus}))
           )
         )
+        await summary
+          .addHeading(`Deployment Finished (${newStatus})`, 3)
+          .addTable([
+            [
+              {data: 'ID', header: true},
+              {data: 'Status', header: true},
+              {data: 'URL', header: true}
+            ],
+            ...deployments.map((dep, i) => [
+              dep.id,
+              newStatus,
+              environmentsUrl?.[i] || '-'
+            ])
+          ])
+          .write()
         break
       }
 
@@ -354,6 +405,10 @@ export async function run(
           console.log(
             `[dry-run] would deactivate environments: ${environments.join(', ')}`
           )
+          await summary
+            .addHeading('[Dry Run] Environments Deactivated', 3)
+            .addRaw(environments.join(', '))
+            .write()
           break
         }
 
@@ -362,6 +417,10 @@ export async function run(
         )
 
         reportSettledResults(results, 'Deactivate environments')
+        await summary
+          .addHeading('Environments Deactivated', 3)
+          .addRaw(environments.join(', '))
+          .write()
         break
       }
 
@@ -381,10 +440,14 @@ export async function run(
           console.log(
             `[dry-run] would delete environments: ${environments.join(', ')}`
           )
+          await summary
+            .addHeading('[Dry Run] Environments Deleted', 3)
+            .addRaw(environments.join(', '))
+            .write()
           break
         }
 
-        const results = await Promise.allSettled(
+        const deleteResults = await Promise.allSettled(
           environments.map(env =>
             withRetry(() =>
               github.rest.repos.deleteAnEnvironment({
@@ -396,7 +459,11 @@ export async function run(
           )
         )
 
-        reportSettledResults(results, 'Delete environments')
+        reportSettledResults(deleteResults, 'Delete environments')
+        await summary
+          .addHeading('Environments Deleted', 3)
+          .addRaw(environments.join(', '))
+          .write()
         break
       }
 
@@ -418,6 +485,14 @@ export async function run(
         }
 
         setOutput('env', JSON.stringify(env))
+        await summary
+          .addHeading('Environments Found', 3)
+          .addRaw(
+            env.length > 0
+              ? env.join(', ')
+              : `No environments found for ref \`${args.gitRef}\``
+          )
+          .write()
         break
       }
 
