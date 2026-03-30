@@ -53,6 +53,8 @@ export interface CoreArgs {
   dryRun: boolean
   payload?: string
   autoInactive: boolean
+  transientEnvironment: boolean
+  productionEnvironment: boolean
 }
 
 /**
@@ -60,7 +62,6 @@ export interface CoreArgs {
  */
 export interface StartStepArgs extends CoreArgs {
   environment: string
-  override?: string
   gitRef: string
 }
 
@@ -86,11 +87,6 @@ export interface EnvStepArgs extends CoreArgs {
 export interface GetEnvStepArgs extends CoreArgs {
   gitRef: string
 }
-
-/**
- * Result of parsing environment input
- */
-export type EnvironmentInput = string | string[]
 
 /**
  * Helper function to check if a value is a valid deployment status

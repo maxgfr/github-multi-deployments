@@ -34,6 +34,8 @@ function createMockContext(
       dryRun: false,
       payload: undefined,
       autoInactive: false,
+      transientEnvironment: true,
+      productionEnvironment: false,
       ...coreArgsOverrides
     }
   }

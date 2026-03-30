@@ -43,6 +43,17 @@ inputs:
     required: false
     description: "Automatically mark previous deployments as inactive via GitHub API, skipping manual deactivation. Set to 'true' to enable. (For `start` only)"
     default: 'false'
+  log_url:
+    required: false
+    description: Custom URL for deployment logs. Defaults to the commit checks page.
+  transient_environment:
+    required: false
+    description: "Mark the environment as transient (will be destroyed). Set to 'false' for permanent environments like production. Default: 'true'."
+    default: 'true'
+  production_environment:
+    required: false
+    description: "Mark the deployment as a production environment. Set to 'true' to enable. Default: 'false'."
+    default: 'false'
   dry_run:
     required: false
     description: "Enable dry-run mode. Logs what would happen without making API calls. Set to 'true' to enable."

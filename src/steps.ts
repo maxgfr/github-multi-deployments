@@ -129,7 +129,6 @@ export async function run(
         const args: StartStepArgs = {
           ...context.coreArgs,
           environment: getInput('env', {required: true}),
-          override: getInput('override'),
           gitRef: getInput('ref') || context.ref
         }
 
@@ -176,7 +175,8 @@ export async function run(
                 environment: env,
                 auto_merge: false,
                 description: args.desc,
-                transient_environment: true,
+                transient_environment: args.transientEnvironment,
+                production_environment: args.productionEnvironment,
                 payload: args.payload || '',
                 ...(args.autoInactive && {auto_inactive: true})
               })
@@ -220,7 +220,6 @@ export async function run(
                 repo: context.repo,
                 deployment_id: parseInt(String(deployment.data.id), 10),
                 state: 'in_progress',
-                ref: context.ref,
                 description: args.desc,
                 log_url: args.logsURL
               })
@@ -262,6 +261,13 @@ export async function run(
 
         if (args.envURL) {
           environmentsUrl = parseArrayOrString(args.envURL)
+          const invalidUrls = environmentsUrl.filter(url => !isValidUrl(url))
+          if (invalidUrls.length > 0) {
+            error(`Invalid environment URL(s): ${invalidUrls.join(', ')}`)
+            throw new Error(
+              `Invalid environment URL(s): ${invalidUrls.join(', ')}`
+            )
+          }
         }
 
         if (!isValidDeploymentStatus(args.status)) {
@@ -308,7 +314,6 @@ export async function run(
                 repo: context.repo,
                 deployment_id: parseInt(dep.id, 10),
                 state: newStatus,
-                ref: context.ref,
                 description: args.desc,
                 environment_url:
                   newStatus === 'success' && environmentsUrl

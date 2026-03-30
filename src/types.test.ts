@@ -22,7 +22,7 @@ describe('types', () => {
         'pending'
       ]
 
-      validStatuses.forEach((status) => {
+      validStatuses.forEach(status => {
         expect(isValidDeploymentStatus(status)).toBe(true)
       })
     })

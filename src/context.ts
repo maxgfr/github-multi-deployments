@@ -51,12 +51,16 @@ export function collectDeploymentContext(): DeploymentContext {
     repo,
     github,
     coreArgs: {
-      logsURL: `https://github.com/${owner}/${repo}/commit/${sha}/checks`,
+      logsURL:
+        getInput('log_url') ||
+        `https://github.com/${owner}/${repo}/commit/${sha}/checks`,
       desc: getInput('desc'),
       isDebug: getInput('debug') === 'true',
       dryRun: getInput('dry_run') === 'true',
       payload: getInput('payload') || undefined,
-      autoInactive: getInput('auto_inactive') === 'true'
+      autoInactive: getInput('auto_inactive') === 'true',
+      transientEnvironment: getInput('transient_environment') !== 'false',
+      productionEnvironment: getInput('production_environment') === 'true'
     }
   }
 }

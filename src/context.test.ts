@@ -156,6 +156,55 @@ describe('collectDeploymentContext', () => {
     )
   })
 
+  it('should use custom log_url when provided', () => {
+    setupInputs({
+      token: 'test-token',
+      log_url: 'https://my-dashboard.com/logs/123'
+    })
+
+    const ctx = collectDeploymentContext()
+
+    expect(ctx.coreArgs.logsURL).toBe('https://my-dashboard.com/logs/123')
+  })
+
+  it('should default transient_environment to true', () => {
+    setupInputs({token: 'test-token'})
+
+    const ctx = collectDeploymentContext()
+
+    expect(ctx.coreArgs.transientEnvironment).toBe(true)
+  })
+
+  it('should set transient_environment to false when explicitly set', () => {
+    setupInputs({
+      token: 'test-token',
+      transient_environment: 'false'
+    })
+
+    const ctx = collectDeploymentContext()
+
+    expect(ctx.coreArgs.transientEnvironment).toBe(false)
+  })
+
+  it('should default production_environment to false', () => {
+    setupInputs({token: 'test-token'})
+
+    const ctx = collectDeploymentContext()
+
+    expect(ctx.coreArgs.productionEnvironment).toBe(false)
+  })
+
+  it('should set production_environment to true when explicitly set', () => {
+    setupInputs({
+      token: 'test-token',
+      production_environment: 'true'
+    })
+
+    const ctx = collectDeploymentContext()
+
+    expect(ctx.coreArgs.productionEnvironment).toBe(true)
+  })
+
   it('should construct logsURL with custom repository', () => {
     setupInputs({
       token: 'test-token',

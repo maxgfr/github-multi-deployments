@@ -29,7 +29,9 @@ function createMockContext(): DeploymentContext {
       isDebug: false,
       dryRun: false,
       payload: undefined,
-      autoInactive: false
+      autoInactive: false,
+      transientEnvironment: true,
+      productionEnvironment: false
     }
   }
 }
@@ -90,5 +92,23 @@ describe('getEnvByRef', () => {
 
     const result = await getEnvByRef(context, 'main')
     expect(result).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('should only log deployments data in debug mode', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
+    const context = createMockContext()
+    ;(context.github.paginate as unknown as jest.Mock).mockResolvedValue([
+      {environment: 'staging'}
+    ])
+
+    await getEnvByRef(context, 'main')
+    expect(consoleSpy).not.toHaveBeenCalledWith('Deployments data')
+
+    consoleSpy.mockClear()
+    context.coreArgs.isDebug = true
+    await getEnvByRef(context, 'main')
+    expect(consoleSpy).toHaveBeenCalledWith('Deployments data')
+
+    consoleSpy.mockRestore()
   })
 })

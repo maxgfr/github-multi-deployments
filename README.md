@@ -145,7 +145,10 @@ deployment_id|string[] or string|no|Deployment(s) id(s) to update. Can be a JSON
 env_url|string[] or string|no|Environment(s) url. Can be a JSON array string like `'["https://...", "https://..."]'` or a single URL. (For `finish` only)
 status|string|no|Status of the deployment. Valid values: `success`, `failure`, `cancelled`, `error`, `inactive`, `in_progress`, `queued`, `pending`. (For `finish` only)
 payload|string|no|JSON payload with extra information about the deployment. (For `start` only)
-auto_inactive|boolean|no|Automatically mark previous deployments as inactive via GitHub API, skipping manual deactivation. Set to `'true'` to enable. (For `start` only)
+auto_inactive|boolean|no|Automatically mark previous deployments as inactive via GitHub API, skipping manual deactivation. (For `start` only)
+log_url|string|no|Custom URL for deployment logs. Defaults to the commit checks page.
+transient_environment|boolean|no|Mark the environment as transient (will be destroyed). Set to `'false'` for permanent environments. Default: `'true'`. (For `start` only)
+production_environment|boolean|no|Mark the deployment as a production environment. Default: `'false'`. (For `start` only)
 dry_run|boolean|no|Enable dry-run mode that logs what would happen without making API calls. Set to `'true'` to enable.
 debug|boolean|no|Enable debug mode for troubleshooting. Set to `'true'` to enable.
 

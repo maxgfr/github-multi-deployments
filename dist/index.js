@@ -35,12 +35,15 @@ function collectDeploymentContext() {
         repo,
         github,
         coreArgs: {
-            logsURL: `https://github.com/${owner}/${repo}/commit/${sha}/checks`,
+            logsURL: (0, core_1.getInput)('log_url') ||
+                `https://github.com/${owner}/${repo}/commit/${sha}/checks`,
             desc: (0, core_1.getInput)('desc'),
             isDebug: (0, core_1.getInput)('debug') === 'true',
             dryRun: (0, core_1.getInput)('dry_run') === 'true',
             payload: (0, core_1.getInput)('payload') || undefined,
-            autoInactive: (0, core_1.getInput)('auto_inactive') === 'true'
+            autoInactive: (0, core_1.getInput)('auto_inactive') === 'true',
+            transientEnvironment: (0, core_1.getInput)('transient_environment') !== 'false',
+            productionEnvironment: (0, core_1.getInput)('production_environment') === 'true'
         }
     };
 }
@@ -93,7 +96,7 @@ function deactivateEnvironment(context, environment) {
             console.log(`[dry-run] would deactivate ${existing} deployments for env ${environment}`);
             return { environment, count: existing };
         }
-        const results = yield Promise.allSettled(deployments.map((deployment) => {
+        const results = yield Promise.allSettled(deployments.map(deployment => {
             console.log(`setting deployment '${environment}.${deployment.id}' (${deployment.sha}) state to "${deadState}"`);
             return (0, retry_1.withRetry)(() => client.rest.repos.createDeploymentStatus({
                 owner,
@@ -102,7 +105,7 @@ function deactivateEnvironment(context, environment) {
                 state: deadState
             }));
         }));
-        const failures = results.filter((r) => r.status === 'rejected');
+        const failures = results.filter(r => r.status === 'rejected');
         if (failures.length > 0) {
             console.log(`${failures.length}/${existing} deployments failed to deactivate for env ${environment}`);
             throw new Error(`Failed to deactivate ${failures.length}/${existing} deployments for env ${environment}`);
@@ -140,16 +143,19 @@ const retry_1 = __nccwpck_require__(9673);
  * @param ref - The git ref (branch, tag, or commit SHA) to query deployments for
  * @returns Promise that resolves to an array of unique environment names
  */
-function getEnvByRef(_a, ref_1) {
-    return __awaiter(this, arguments, void 0, function* ({ github: client, owner, repo }, ref) {
+function getEnvByRef(context, ref) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const { github: client, owner, repo } = context;
         const deployments = yield (0, retry_1.withRetry)(() => client.paginate(client.rest.repos.listDeployments, {
             owner,
             repo,
             ref
         }));
-        console.log('Deployments data');
-        console.log(deployments);
-        const envs = deployments.map((dep) => dep.environment);
+        if (context.coreArgs.isDebug) {
+            console.log('Deployments data');
+            console.log(deployments);
+        }
+        const envs = deployments.map(dep => dep.environment);
         // Remove duplicates using Set
         return [...new Set(envs)];
     });
@@ -272,7 +278,7 @@ function withRetry(fn_1) {
                 if (attempt < opts.maxRetries) {
                     const delay = Math.min(opts.baseDelayMs * Math.pow(2, attempt), opts.maxDelayMs);
                     console.log(`Attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
-                    yield new Promise((resolve) => setTimeout(resolve, delay));
+                    yield new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
         }
@@ -389,7 +395,7 @@ function parseDeploymentIds(input) {
  */
 function reportSettledResults(results, label) {
     const failures = results.filter((r) => r.status === 'rejected');
-    const successes = results.filter((r) => r.status === 'fulfilled');
+    const successes = results.filter(r => r.status === 'fulfilled');
     if (successes.length > 0) {
         console.log(`${label}: ${successes.length} succeeded`);
     }
@@ -406,7 +412,7 @@ function run(step, context) {
         try {
             switch (step) {
                 case Step.Start: {
-                    const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: true }), override: (0, core_1.getInput)('override'), gitRef: (0, core_1.getInput)('ref') || context.ref });
+                    const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: true }), gitRef: (0, core_1.getInput)('ref') || context.ref });
                     if (args.isDebug) {
                         console.log(`'${step}' arguments`, args);
                     }
@@ -426,11 +432,11 @@ function run(step, context) {
                     }
                     // Deactivate existing deployments unless auto_inactive is enabled
                     if (!args.autoInactive) {
-                        const deactivateResults = yield Promise.allSettled(environments.map((env) => (0, deactivate_1.default)(context, env)));
+                        const deactivateResults = yield Promise.allSettled(environments.map(env => (0, deactivate_1.default)(context, env)));
                         reportSettledResults(deactivateResults, 'Deactivate environments');
                     }
                     // Create new deployments
-                    const deploymentResults = yield Promise.allSettled(environments.map((env) => (0, retry_1.withRetry)(() => github.rest.repos.createDeployment(Object.assign({ owner: context.owner, repo: context.repo, ref: args.gitRef, required_contexts: [], environment: env, auto_merge: false, description: args.desc, transient_environment: true, payload: args.payload || '' }, (args.autoInactive && { auto_inactive: true }))))));
+                    const deploymentResults = yield Promise.allSettled(environments.map(env => (0, retry_1.withRetry)(() => github.rest.repos.createDeployment(Object.assign({ owner: context.owner, repo: context.repo, ref: args.gitRef, required_contexts: [], environment: env, auto_merge: false, description: args.desc, transient_environment: args.transientEnvironment, production_environment: args.productionEnvironment, payload: args.payload || '' }, (args.autoInactive && { auto_inactive: true }))))));
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const deploymentsData = [];
                     const failedEnvs = [];
@@ -458,7 +464,6 @@ function run(step, context) {
                         repo: context.repo,
                         deployment_id: parseInt(String(deployment.data.id), 10),
                         state: 'in_progress',
-                        ref: context.ref,
                         description: args.desc,
                         log_url: args.logsURL
                     }))));
@@ -479,6 +484,11 @@ function run(step, context) {
                     let environmentsUrl;
                     if (args.envURL) {
                         environmentsUrl = parseArrayOrString(args.envURL);
+                        const invalidUrls = environmentsUrl.filter(url => !(0, url_1.isValidUrl)(url));
+                        if (invalidUrls.length > 0) {
+                            (0, core_1.error)(`Invalid environment URL(s): ${invalidUrls.join(', ')}`);
+                            throw new Error(`Invalid environment URL(s): ${invalidUrls.join(', ')}`);
+                        }
                     }
                     if (!(0, types_1.isValidDeploymentStatus)(args.status)) {
                         (0, core_1.error)(`unexpected status ${args.status}`);
@@ -495,7 +505,7 @@ function run(step, context) {
                     }
                     if (args.dryRun) {
                         console.log(`[dry-run] would set status "${newStatus}" for ${deployments.length} deployment(s)`);
-                        (0, core_1.setOutput)('deployment_id', JSON.stringify(deployments.map((dep) => ({ id: dep.id, status: newStatus }))));
+                        (0, core_1.setOutput)('deployment_id', JSON.stringify(deployments.map(dep => ({ id: dep.id, status: newStatus }))));
                         break;
                     }
                     const results = yield Promise.allSettled(deployments.map((dep, i) => (0, retry_1.withRetry)(() => github.rest.repos.createDeploymentStatus({
@@ -503,18 +513,16 @@ function run(step, context) {
                         repo: context.repo,
                         deployment_id: parseInt(dep.id, 10),
                         state: newStatus,
-                        ref: context.ref,
                         description: args.desc,
                         environment_url: newStatus === 'success' && environmentsUrl
                             ? environmentsUrl[i]
-                            : newStatus === 'success' &&
-                                (0, url_1.isValidUrl)(dep.deployment_url)
+                            : newStatus === 'success' && (0, url_1.isValidUrl)(dep.deployment_url)
                                 ? dep.deployment_url
                                 : '',
                         log_url: args.logsURL
                     }))));
                     reportSettledResults(results, 'Update deployment statuses');
-                    (0, core_1.setOutput)('deployment_id', JSON.stringify(deployments.map((dep) => ({ id: dep.id, status: newStatus }))));
+                    (0, core_1.setOutput)('deployment_id', JSON.stringify(deployments.map(dep => ({ id: dep.id, status: newStatus }))));
                     break;
                 }
                 case Step.DeactivateEnv: {
@@ -527,7 +535,7 @@ function run(step, context) {
                         console.log(`[dry-run] would deactivate environments: ${environments.join(', ')}`);
                         break;
                     }
-                    const results = yield Promise.allSettled(environments.map((env) => (0, deactivate_1.default)(context, env)));
+                    const results = yield Promise.allSettled(environments.map(env => (0, deactivate_1.default)(context, env)));
                     reportSettledResults(results, 'Deactivate environments');
                     break;
                 }
@@ -541,7 +549,7 @@ function run(step, context) {
                         console.log(`[dry-run] would delete environments: ${environments.join(', ')}`);
                         break;
                     }
-                    const results = yield Promise.allSettled(environments.map((env) => (0, retry_1.withRetry)(() => github.rest.repos.deleteAnEnvironment({
+                    const results = yield Promise.allSettled(environments.map(env => (0, retry_1.withRetry)(() => github.rest.repos.deleteAnEnvironment({
                         owner: context.owner,
                         repo: context.repo,
                         environment_name: env

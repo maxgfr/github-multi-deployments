@@ -83,6 +83,8 @@ function createMockContext(
       dryRun: false,
       payload: undefined,
       autoInactive: false,
+      transientEnvironment: true,
+      productionEnvironment: false,
       ...overrides.coreArgs
     }
   } as DeploymentContext
@@ -210,6 +212,24 @@ describe('steps', () => {
         {id: '2', deployment_url: 'https://b.com'},
         {id: '3', deployment_url: ''}
       ])
+    })
+
+    it('should throw for boolean JSON value', () => {
+      expect(() => parseDeploymentIds('true')).toThrow(
+        'Invalid deployment_id format'
+      )
+    })
+
+    it('should throw for null JSON value', () => {
+      expect(() => parseDeploymentIds('null')).toThrow(
+        'Invalid deployment_id format'
+      )
+    })
+
+    it('should throw for null element in array', () => {
+      expect(() => parseDeploymentIds('[null]')).toThrow(
+        'Invalid deployment data'
+      )
     })
   })
 
@@ -359,6 +379,70 @@ describe('steps', () => {
       await run(Step.Start, context)
 
       expect(mockSetFailed).toHaveBeenCalled()
+    })
+
+    it('should log debug info when isDebug is true', async () => {
+      const mockGithub = createMockGithub()
+      const context = createMockContext({
+        github: mockGithub,
+        coreArgs: {isDebug: true}
+      })
+      mockInputs({env: 'staging', ref: 'main'})
+
+      await run(Step.Start, context)
+
+      expect(mockGithub.rest.repos.createDeployment).toHaveBeenCalled()
+      expect(mockSetOutput).toHaveBeenCalledWith('env', 'staging')
+    })
+
+    it('should fail when status creation fails', async () => {
+      const mockGithub = createMockGithub()
+      mockGithub.rest.repos.createDeploymentStatus.mockRejectedValue(
+        new Error('Status API error')
+      )
+      const context = createMockContext({github: mockGithub})
+      mockInputs({env: 'staging', ref: 'main'})
+
+      await run(Step.Start, context)
+
+      expect(mockSetFailed).toHaveBeenCalledWith(
+        expect.stringContaining('unexpected error')
+      )
+    })
+
+    it('should fail when deactivation fails', async () => {
+      ;(deactivateEnvironment as jest.Mock).mockRejectedValueOnce(
+        new Error('Deactivation failed')
+      )
+      const context = createMockContext()
+      mockInputs({env: 'staging', ref: 'main'})
+
+      await run(Step.Start, context)
+
+      expect(mockSetFailed).toHaveBeenCalledWith(
+        expect.stringContaining('unexpected error')
+      )
+    })
+
+    it('should pass transient and production environment flags', async () => {
+      const mockGithub = createMockGithub()
+      const context = createMockContext({
+        github: mockGithub,
+        coreArgs: {
+          transientEnvironment: false,
+          productionEnvironment: true
+        }
+      })
+      mockInputs({env: 'production', ref: 'main'})
+
+      await run(Step.Start, context)
+
+      expect(mockGithub.rest.repos.createDeployment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transient_environment: false,
+          production_environment: true
+        })
+      )
     })
   })
 
@@ -558,6 +642,39 @@ describe('steps', () => {
 
       expect(mockSetFailed).toHaveBeenCalled()
     })
+
+    it('should reject invalid env_url values', async () => {
+      const context = createMockContext()
+
+      mockInputs({
+        status: 'success',
+        deployment_id: JSON.stringify([{id: '1', deployment_url: ''}]),
+        env_url: '["not-a-valid-url"]'
+      })
+
+      await run(Step.Finish, context)
+
+      expect(mockSetFailed).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid environment URL')
+      )
+    })
+
+    it('should log debug info when isDebug is true', async () => {
+      const mockGithub = createMockGithub()
+      const context = createMockContext({
+        github: mockGithub,
+        coreArgs: {isDebug: true}
+      })
+
+      mockInputs({
+        status: 'success',
+        deployment_id: JSON.stringify([{id: '1', deployment_url: ''}])
+      })
+
+      await run(Step.Finish, context)
+
+      expect(mockGithub.rest.repos.createDeploymentStatus).toHaveBeenCalled()
+    })
   })
 
   describe('run - DeactivateEnv step', () => {
@@ -602,6 +719,15 @@ describe('steps', () => {
       await run(Step.DeactivateEnv, context)
 
       expect(deactivateEnvironment).not.toHaveBeenCalled()
+    })
+
+    it('should log debug info when isDebug is true', async () => {
+      const context = createMockContext({coreArgs: {isDebug: true}})
+      mockInputs({env: 'staging'})
+
+      await run(Step.DeactivateEnv, context)
+
+      expect(deactivateEnvironment).toHaveBeenCalledWith(context, 'staging')
     })
   })
 
@@ -651,6 +777,19 @@ describe('steps', () => {
 
       expect(mockGithub.rest.repos.deleteAnEnvironment).not.toHaveBeenCalled()
     })
+
+    it('should log debug info when isDebug is true', async () => {
+      const mockGithub = createMockGithub()
+      const context = createMockContext({
+        github: mockGithub,
+        coreArgs: {isDebug: true}
+      })
+      mockInputs({env: 'staging'})
+
+      await run(Step.DeleteEnv, context)
+
+      expect(mockGithub.rest.repos.deleteAnEnvironment).toHaveBeenCalled()
+    })
   })
 
   describe('run - GetEnv step', () => {
@@ -676,6 +815,16 @@ describe('steps', () => {
       await run(Step.GetEnv, context)
 
       expect(getEnvByRef).toHaveBeenCalledWith(context, 'refs/heads/main')
+    })
+
+    it('should log debug info when isDebug is true', async () => {
+      const context = createMockContext({coreArgs: {isDebug: true}})
+      mockInputs({ref: 'main'})
+
+      await run(Step.GetEnv, context)
+
+      expect(getEnvByRef).toHaveBeenCalledWith(context, 'main')
+      expect(mockSetOutput).toHaveBeenCalledWith('env', expect.any(String))
     })
   })
 
