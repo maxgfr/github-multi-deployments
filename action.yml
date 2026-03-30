@@ -14,7 +14,7 @@ inputs:
     description: GitHub token
   step:
     required: true
-    description: One of 'start' and 'finish'
+    description: "One of 'start', 'finish', 'deactivate-env', 'delete-env', 'get-env'"
   desc:
     required: false
     description: Description to set in status
@@ -29,13 +29,30 @@ inputs:
     description: The name of the deployment environment for Github. It could be an array of string. (Required for `start`, `deactivate-env` and `delete-env`)
   deployment_id:
     required: false
-    description: The deployment id to update (if specified during `start`, the deployment will be updated instead of a new one created)
+    description: The deployment id to update. Can be a JSON array of deployment objects or a single ID. (Required for `finish`)
   env_url:
     required: false
     description: The environment URL. It could be an array of string. (For `finish` only)
   status:
     required: false
     description: The deployment status. (For `finish` only)
+  payload:
+    required: false
+    description: JSON payload with extra information about the deployment. (For `start` only)
+  auto_inactive:
+    required: false
+    description: "Automatically mark previous deployments as inactive via GitHub API, skipping manual deactivation. Set to 'true' to enable. (For `start` only)"
+    default: 'false'
+  dry_run:
+    required: false
+    description: "Enable dry-run mode. Logs what would happen without making API calls. Set to 'true' to enable."
+    default: 'false'
   debug:
     required: false
     description: Print arguments used by this action.
+
+outputs:
+  deployment_id:
+    description: JSON array of deployment objects with IDs and environment information (from `start` and `finish` steps)
+  env:
+    description: "The environment(s) for the deployment. For `start`: the original input value. For `get-env`: JSON array of environment names."

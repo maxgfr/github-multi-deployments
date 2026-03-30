@@ -15,12 +15,6 @@ const github_1 = __nccwpck_require__(4903);
  *
  * @returns Deployment context with GitHub client and repository information
  * @throws Error if repository format is invalid
- *
- * @example
- * ```typescript
- * const context = collectDeploymentContext()
- * console.log(`targeting ${context.owner}/${context.repo}`)
- * ```
  */
 function collectDeploymentContext() {
     const { sha } = github_1.context;
@@ -43,7 +37,10 @@ function collectDeploymentContext() {
         coreArgs: {
             logsURL: `https://github.com/${owner}/${repo}/commit/${sha}/checks`,
             desc: (0, core_1.getInput)('desc'),
-            isDebug: (0, core_1.getInput)('debug') === 'true'
+            isDebug: (0, core_1.getInput)('debug') === 'true',
+            dryRun: (0, core_1.getInput)('dry_run') === 'true',
+            payload: (0, core_1.getInput)('payload') || undefined,
+            autoInactive: (0, core_1.getInput)('auto_inactive') === 'true'
         }
     };
 }
@@ -52,7 +49,7 @@ function collectDeploymentContext() {
 /***/ }),
 
 /***/ 1685:
-/***/ (function(__unused_webpack_module, exports) {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
@@ -66,45 +63,50 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+const retry_1 = __nccwpck_require__(9673);
 /**
  * Deactivates all existing deployments for a given environment.
+ * Uses pagination to handle environments with many deployments.
  * Sets the deployment status to 'inactive' for all active deployments.
  *
  * @param context - The deployment context containing GitHub client and repository info
  * @param environment - The name of the environment to deactivate
  * @returns Promise that resolves when all deployments are deactivated
- *
- * @example
- * ```typescript
- * await deactivateEnvironment(context, 'production')
- * // Output: "found 3 existing deployments for env production - marking as inactive"
- * ```
  */
-function deactivateEnvironment(_a, environment_1) {
-    return __awaiter(this, arguments, void 0, function* ({ github: client, owner, repo }, environment) {
-        const deployments = yield client.rest.repos.listDeployments({
+function deactivateEnvironment(context, environment) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const { github: client, owner, repo } = context;
+        const { dryRun } = context.coreArgs;
+        const deployments = yield (0, retry_1.withRetry)(() => client.paginate(client.rest.repos.listDeployments, {
             owner,
             repo,
             environment
-        });
-        const existing = deployments.data.length;
+        }));
+        const existing = deployments.length;
         if (existing < 1) {
             console.log(`found no existing deployments for env ${environment}`);
             return { environment, count: 0 };
         }
         const deadState = 'inactive';
         console.log(`found ${existing} existing deployments for env ${environment} - marking as ${deadState}`);
-        // Deactivate all deployments in parallel for better performance
-        const deactivationPromises = deployments.data.map((deployment) => {
+        if (dryRun) {
+            console.log(`[dry-run] would deactivate ${existing} deployments for env ${environment}`);
+            return { environment, count: existing };
+        }
+        const results = yield Promise.allSettled(deployments.map((deployment) => {
             console.log(`setting deployment '${environment}.${deployment.id}' (${deployment.sha}) state to "${deadState}"`);
-            return client.rest.repos.createDeploymentStatus({
+            return (0, retry_1.withRetry)(() => client.rest.repos.createDeploymentStatus({
                 owner,
                 repo,
                 deployment_id: deployment.id,
                 state: deadState
-            });
-        });
-        yield Promise.all(deactivationPromises);
+            }));
+        }));
+        const failures = results.filter((r) => r.status === 'rejected');
+        if (failures.length > 0) {
+            console.log(`${failures.length}/${existing} deployments failed to deactivate for env ${environment}`);
+            throw new Error(`Failed to deactivate ${failures.length}/${existing} deployments for env ${environment}`);
+        }
         console.log(`${existing} deployments updated`);
         return { environment, count: existing };
     });
@@ -115,7 +117,7 @@ exports["default"] = deactivateEnvironment;
 /***/ }),
 
 /***/ 8277:
-/***/ (function(__unused_webpack_module, exports) {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
@@ -129,29 +131,25 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+const retry_1 = __nccwpck_require__(9673);
 /**
  * Gets all unique environments for deployments on a specific git ref.
+ * Uses pagination to handle refs with many deployments.
  *
  * @param context - The deployment context containing GitHub client and repository info
  * @param ref - The git ref (branch, tag, or commit SHA) to query deployments for
  * @returns Promise that resolves to an array of unique environment names
- *
- * @example
- * ```typescript
- * const environments = await getEnvByRef(context, 'main')
- * // Returns: ['production', 'staging']
- * ```
  */
 function getEnvByRef(_a, ref_1) {
     return __awaiter(this, arguments, void 0, function* ({ github: client, owner, repo }, ref) {
-        const deployments = yield client.rest.repos.listDeployments({
+        const deployments = yield (0, retry_1.withRetry)(() => client.paginate(client.rest.repos.listDeployments, {
             owner,
             repo,
             ref
-        });
+        }));
         console.log('Deployments data');
-        console.log(deployments.data);
-        const envs = deployments.data.map((dep) => dep.environment);
+        console.log(deployments);
+        const envs = deployments.map((dep) => dep.environment);
         // Remove duplicates using Set
         return [...new Set(envs)];
     });
@@ -221,8 +219,13 @@ function main() {
         try {
             const context = (0, context_1.collectDeploymentContext)();
             console.log(`targeting ${context.owner}/${context.repo}`);
-            const step = core.getInput('step', { required: true });
-            yield (0, steps_1.run)(step, context);
+            const stepInput = core.getInput('step', { required: true });
+            const validSteps = Object.values(steps_1.Step);
+            if (!validSteps.includes(stepInput)) {
+                core.setFailed(`Invalid step "${stepInput}". Must be one of: ${validSteps.join(', ')}`);
+                return;
+            }
+            yield (0, steps_1.run)(stepInput, context);
         }
         catch (error) {
             core.setFailed(`Action failed: ${error}`);
@@ -231,6 +234,51 @@ function main() {
     });
 }
 main();
+
+
+/***/ }),
+
+/***/ 9673:
+/***/ (function(__unused_webpack_module, exports) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.withRetry = withRetry;
+const DEFAULT_OPTIONS = {
+    maxRetries: 3,
+    baseDelayMs: 1000,
+    maxDelayMs: 10000
+};
+function withRetry(fn_1) {
+    return __awaiter(this, arguments, void 0, function* (fn, options = {}) {
+        const opts = Object.assign(Object.assign({}, DEFAULT_OPTIONS), options);
+        let lastError;
+        for (let attempt = 0; attempt <= opts.maxRetries; attempt++) {
+            try {
+                return yield fn();
+            }
+            catch (err) {
+                lastError = err instanceof Error ? err : new Error(String(err));
+                if (attempt < opts.maxRetries) {
+                    const delay = Math.min(opts.baseDelayMs * Math.pow(2, attempt), opts.maxDelayMs);
+                    console.log(`Attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+                    yield new Promise((resolve) => setTimeout(resolve, delay));
+                }
+            }
+        }
+        throw lastError;
+    });
+}
 
 
 /***/ }),
@@ -254,11 +302,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Step = void 0;
+exports.parseArrayOrString = parseArrayOrString;
+exports.parseDeploymentIds = parseDeploymentIds;
 exports.run = run;
 const core_1 = __nccwpck_require__(6966);
 const deactivate_1 = __importDefault(__nccwpck_require__(1685));
 const get_env_1 = __importDefault(__nccwpck_require__(8277));
 const url_1 = __nccwpck_require__(3598);
+const retry_1 = __nccwpck_require__(9673);
+const types_1 = __nccwpck_require__(7550);
 var Step;
 (function (Step) {
     Step["Start"] = "start";
@@ -287,56 +339,66 @@ function parseArrayOrString(input) {
     }
 }
 /**
+ * Convert an unknown value to DeploymentData with validation
+ */
+function toDeploymentData(dep) {
+    if (typeof dep === 'string' || typeof dep === 'number') {
+        return { id: String(dep), deployment_url: '' };
+    }
+    if (typeof dep === 'object' && dep !== null) {
+        const obj = dep;
+        if (!('id' in obj)) {
+            throw new Error(`Deployment object missing required 'id' field: ${JSON.stringify(dep)}`);
+        }
+        return {
+            id: String(obj.id),
+            deployment_url: typeof obj.deployment_url === 'string' ? obj.deployment_url : ''
+        };
+    }
+    throw new Error(`Invalid deployment data: ${JSON.stringify(dep)}`);
+}
+/**
  * Safely parse deployment_id input
  * @param input - The deployment_id JSON string
  * @returns Array of deployment data objects
  */
 function parseDeploymentIds(input) {
+    let parsed;
     try {
-        const parsed = JSON.parse(input);
-        // Handle single value (string or number)
-        if (typeof parsed === 'string' || typeof parsed === 'number') {
-            return [{ id: String(parsed), deployment_url: '' }];
-        }
-        // Handle array of deployment objects
-        if (Array.isArray(parsed)) {
-            return parsed.map((dep) => {
-                if (typeof dep === 'string' || typeof dep === 'number') {
-                    return { id: String(dep), deployment_url: '' };
-                }
-                if (typeof dep === 'object' && dep !== null) {
-                    return dep;
-                }
-                throw new Error(`Invalid deployment data: ${JSON.stringify(dep)}`);
-            });
-        }
-        // Handle single deployment object
-        if (typeof parsed === 'object' && parsed !== null) {
-            return [parsed];
-        }
-        throw new Error(`Invalid deployment_id format: ${input}`);
+        parsed = JSON.parse(input);
     }
-    catch (err) {
-        throw new Error(`Failed to parse deployment_id: ${err}`);
+    catch (_a) {
+        throw new Error(`Failed to parse deployment_id as JSON: ${input}`);
     }
+    // Handle single value (string or number)
+    if (typeof parsed === 'string' || typeof parsed === 'number') {
+        return [{ id: String(parsed), deployment_url: '' }];
+    }
+    // Handle array of deployment objects
+    if (Array.isArray(parsed)) {
+        return parsed.map(toDeploymentData);
+    }
+    // Handle single deployment object
+    if (typeof parsed === 'object' && parsed !== null) {
+        return [toDeploymentData(parsed)];
+    }
+    throw new Error(`Invalid deployment_id format: ${input}`);
 }
 /**
- * Validate deployment status
- * @param status - The status to validate
- * @returns true if valid, false otherwise
+ * Report results from Promise.allSettled, throwing if any failed
  */
-function validateStatus(status) {
-    const validStatuses = [
-        'success',
-        'failure',
-        'cancelled',
-        'error',
-        'inactive',
-        'in_progress',
-        'queued',
-        'pending'
-    ];
-    return validStatuses.includes(status);
+function reportSettledResults(results, label) {
+    const failures = results.filter((r) => r.status === 'rejected');
+    const successes = results.filter((r) => r.status === 'fulfilled');
+    if (successes.length > 0) {
+        console.log(`${label}: ${successes.length} succeeded`);
+    }
+    if (failures.length > 0) {
+        failures.forEach((f, i) => {
+            (0, core_1.error)(`${label} failure ${i + 1}: ${f.reason}`);
+        });
+        throw new Error(`${label}: ${failures.length}/${results.length} failed`);
+    }
 }
 function run(step, context) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -352,33 +414,46 @@ function run(step, context) {
                     if (args.isDebug) {
                         console.log(`Environment(s) : ${environments}`);
                     }
-                    // Deactivate existing deployments and create new ones
-                    const deactivatePromises = environments.map((env) => (0, deactivate_1.default)(context, env));
-                    const deploymentPromises = environments.map((env) => github.rest.repos.createDeployment({
-                        owner: context.owner,
-                        repo: context.repo,
-                        ref: args.gitRef,
-                        required_contexts: [],
-                        environment: env,
-                        auto_merge: false,
-                        description: args.desc,
-                        transient_environment: true
-                    }));
-                    let deploymentsData;
-                    try {
-                        yield Promise.all(deactivatePromises);
-                        deploymentsData = yield Promise.all(deploymentPromises);
+                    if (args.dryRun) {
+                        console.log(`[dry-run] would create deployments for environments: ${environments.join(', ')}`);
+                        const mockOutput = environments.map((env, i) => ({
+                            id: `dry-run-${i}`,
+                            deployment_url: env
+                        }));
+                        (0, core_1.setOutput)('deployment_id', JSON.stringify(mockOutput));
+                        (0, core_1.setOutput)('env', args.environment);
+                        break;
                     }
-                    catch (err) {
-                        (0, core_1.error)(`Cannot generate deployments: ${err}`);
-                        throw err;
+                    // Deactivate existing deployments unless auto_inactive is enabled
+                    if (!args.autoInactive) {
+                        const deactivateResults = yield Promise.allSettled(environments.map((env) => (0, deactivate_1.default)(context, env)));
+                        reportSettledResults(deactivateResults, 'Deactivate environments');
+                    }
+                    // Create new deployments
+                    const deploymentResults = yield Promise.allSettled(environments.map((env) => (0, retry_1.withRetry)(() => github.rest.repos.createDeployment(Object.assign({ owner: context.owner, repo: context.repo, ref: args.gitRef, required_contexts: [], environment: env, auto_merge: false, description: args.desc, transient_environment: true, payload: args.payload || '' }, (args.autoInactive && { auto_inactive: true }))))));
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const deploymentsData = [];
+                    const failedEnvs = [];
+                    deploymentResults.forEach((result, index) => {
+                        if (result.status === 'fulfilled') {
+                            deploymentsData.push(result.value);
+                        }
+                        else {
+                            failedEnvs.push(environments[index]);
+                            (0, core_1.error)(`Failed to create deployment for env ${environments[index]}: ${result.reason}`);
+                        }
+                    });
+                    if (failedEnvs.length > 0) {
+                        throw new Error(`Failed to create deployments for: ${failedEnvs.join(', ')}`);
                     }
                     if (args.isDebug) {
                         console.log('Deployments data');
                         console.log(deploymentsData);
                     }
                     // Create deployment status for each deployment
-                    const statusPromises = deploymentsData.map((deployment) => github.rest.repos.createDeploymentStatus({
+                    const statusResults = yield Promise.allSettled(
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    deploymentsData.map((deployment) => (0, retry_1.withRetry)(() => github.rest.repos.createDeploymentStatus({
                         owner: context.owner,
                         repo: context.repo,
                         deployment_id: parseInt(String(deployment.data.id), 10),
@@ -386,21 +461,18 @@ function run(step, context) {
                         ref: context.ref,
                         description: args.desc,
                         log_url: args.logsURL
-                    }));
-                    try {
-                        yield Promise.all(statusPromises);
-                        (0, core_1.setOutput)('deployment_id', JSON.stringify(deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment.data), { deployment_url: environments[index] })))));
-                        (0, core_1.setOutput)('env', args.environment);
-                    }
-                    catch (err) {
-                        console.log(err);
-                        (0, core_1.error)(`Cannot generate deployment status: ${err}`);
-                        throw err;
-                    }
+                    }))));
+                    reportSettledResults(statusResults, 'Create deployment statuses');
+                    (0, core_1.setOutput)('deployment_id', JSON.stringify(
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment.data), { deployment_url: environments[index] })))));
+                    (0, core_1.setOutput)('env', args.environment);
                     break;
                 }
                 case Step.Finish: {
-                    const args = Object.assign(Object.assign({}, context.coreArgs), { status: (0, core_1.getInput)('status', { required: true }).toLowerCase(), deployment: (0, core_1.getInput)('deployment_id', { required: true }), envURL: (0, core_1.getInput)('env_url', { required: false }) });
+                    const args = Object.assign(Object.assign({}, context.coreArgs), { status: (0, core_1.getInput)('status', {
+                            required: true
+                        }).toLowerCase(), deployment: (0, core_1.getInput)('deployment_id', { required: true }), envURL: (0, core_1.getInput)('env_url', { required: false }) });
                     if (args.isDebug) {
                         console.log(`'${step}' arguments`, args);
                     }
@@ -408,7 +480,7 @@ function run(step, context) {
                     if (args.envURL) {
                         environmentsUrl = parseArrayOrString(args.envURL);
                     }
-                    if (!validateStatus(args.status)) {
+                    if (!(0, types_1.isValidDeploymentStatus)(args.status)) {
                         (0, core_1.error)(`unexpected status ${args.status}`);
                         throw new Error(`Invalid status: ${args.status}`);
                     }
@@ -421,70 +493,60 @@ function run(step, context) {
                         (0, core_1.error)('deployment_id and env_url must have the same length');
                         throw new Error(`Length mismatch: deployment_id has ${deployments.length} items, env_url has ${environmentsUrl.length} items`);
                     }
-                    const promises = deployments.map((dep, i) => __awaiter(this, void 0, void 0, function* () {
-                        return github.rest.repos.createDeploymentStatus({
-                            owner: context.owner,
-                            repo: context.repo,
-                            deployment_id: parseInt(dep.id, 10),
-                            state: newStatus,
-                            ref: context.ref,
-                            description: args.desc,
-                            environment_url: newStatus === 'success'
-                                ? environmentsUrl
-                                    ? environmentsUrl[i]
-                                    : (0, url_1.isValidUrl)(dep.deployment_url)
-                                        ? dep.deployment_url
-                                        : ''
+                    if (args.dryRun) {
+                        console.log(`[dry-run] would set status "${newStatus}" for ${deployments.length} deployment(s)`);
+                        (0, core_1.setOutput)('deployment_id', JSON.stringify(deployments.map((dep) => ({ id: dep.id, status: newStatus }))));
+                        break;
+                    }
+                    const results = yield Promise.allSettled(deployments.map((dep, i) => (0, retry_1.withRetry)(() => github.rest.repos.createDeploymentStatus({
+                        owner: context.owner,
+                        repo: context.repo,
+                        deployment_id: parseInt(dep.id, 10),
+                        state: newStatus,
+                        ref: context.ref,
+                        description: args.desc,
+                        environment_url: newStatus === 'success' && environmentsUrl
+                            ? environmentsUrl[i]
+                            : newStatus === 'success' &&
+                                (0, url_1.isValidUrl)(dep.deployment_url)
+                                ? dep.deployment_url
                                 : '',
-                            log_url: args.logsURL
-                        });
-                    }));
-                    try {
-                        yield Promise.all(promises);
-                    }
-                    catch (err) {
-                        console.log(err);
-                        (0, core_1.error)(`Cannot generate deployment status: ${err}`);
-                        throw err;
-                    }
+                        log_url: args.logsURL
+                    }))));
+                    reportSettledResults(results, 'Update deployment statuses');
+                    (0, core_1.setOutput)('deployment_id', JSON.stringify(deployments.map((dep) => ({ id: dep.id, status: newStatus }))));
                     break;
                 }
                 case Step.DeactivateEnv: {
-                    const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: false }) });
+                    const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: true }) });
                     if (args.isDebug) {
                         console.log(`'${step}' arguments`, args);
                     }
                     const environments = parseArrayOrString(args.environment);
-                    const promises = environments.map((env) => (0, deactivate_1.default)(context, env));
-                    try {
-                        yield Promise.all(promises);
+                    if (args.dryRun) {
+                        console.log(`[dry-run] would deactivate environments: ${environments.join(', ')}`);
+                        break;
                     }
-                    catch (err) {
-                        console.log(err);
-                        (0, core_1.error)(`Cannot deactivate deployment status: ${err}`);
-                        throw err;
-                    }
+                    const results = yield Promise.allSettled(environments.map((env) => (0, deactivate_1.default)(context, env)));
+                    reportSettledResults(results, 'Deactivate environments');
                     break;
                 }
                 case Step.DeleteEnv: {
-                    const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: false }) });
+                    const args = Object.assign(Object.assign({}, context.coreArgs), { environment: (0, core_1.getInput)('env', { required: true }) });
                     if (args.isDebug) {
                         console.log(`'${step}' arguments`, args);
                     }
                     const environments = parseArrayOrString(args.environment);
-                    const promises = environments.map((env) => github.rest.repos.deleteAnEnvironment({
+                    if (args.dryRun) {
+                        console.log(`[dry-run] would delete environments: ${environments.join(', ')}`);
+                        break;
+                    }
+                    const results = yield Promise.allSettled(environments.map((env) => (0, retry_1.withRetry)(() => github.rest.repos.deleteAnEnvironment({
                         owner: context.owner,
                         repo: context.repo,
                         environment_name: env
-                    }));
-                    try {
-                        yield Promise.all(promises);
-                    }
-                    catch (err) {
-                        console.log(err);
-                        (0, core_1.error)(`Cannot delete env: ${err}`);
-                        throw err;
-                    }
+                    }))));
+                    reportSettledResults(results, 'Delete environments');
                     break;
                 }
                 case Step.GetEnv: {
@@ -497,14 +559,7 @@ function run(step, context) {
                         console.log(`Deployment by environment for ${args.gitRef} branch :`);
                         console.log(env);
                     }
-                    try {
-                        (0, core_1.setOutput)('env', JSON.stringify(env));
-                    }
-                    catch (err) {
-                        console.log(err);
-                        (0, core_1.error)(`Cannot generate deployment status: ${err}`);
-                        throw err;
-                    }
+                    (0, core_1.setOutput)('env', JSON.stringify(env));
                     break;
                 }
                 default:
@@ -515,6 +570,32 @@ function run(step, context) {
             (0, core_1.setFailed)(`unexpected error encountered: ${err}`);
         }
     });
+}
+
+
+/***/ }),
+
+/***/ 7550:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isValidDeploymentStatus = isValidDeploymentStatus;
+/**
+ * Helper function to check if a value is a valid deployment status
+ */
+function isValidDeploymentStatus(status) {
+    return [
+        'success',
+        'failure',
+        'cancelled',
+        'error',
+        'inactive',
+        'in_progress',
+        'queued',
+        'pending'
+    ].includes(status);
 }
 
 

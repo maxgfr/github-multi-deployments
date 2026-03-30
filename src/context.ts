@@ -1,6 +1,7 @@
 import {getInput} from '@actions/core'
 import {context, getOctokit} from '@actions/github'
 import {GitHub} from '@actions/github/lib/utils'
+import type {CoreArgs} from './types'
 
 /**
  * Deployment context containing all necessary information for deployment operations
@@ -17,14 +18,7 @@ export interface DeploymentContext {
   /** Authenticated GitHub API client */
   github: InstanceType<typeof GitHub>
   /** Core arguments shared across all steps */
-  coreArgs: {
-    /** URL to the commit checks page for logging */
-    logsURL: string
-    /** Optional description for the deployment */
-    desc?: string
-    /** Whether debug mode is enabled */
-    isDebug: boolean
-  }
+  coreArgs: CoreArgs
 }
 
 /**
@@ -32,12 +26,6 @@ export interface DeploymentContext {
  *
  * @returns Deployment context with GitHub client and repository information
  * @throws Error if repository format is invalid
- *
- * @example
- * ```typescript
- * const context = collectDeploymentContext()
- * console.log(`targeting ${context.owner}/${context.repo}`)
- * ```
  */
 export function collectDeploymentContext(): DeploymentContext {
   const {sha} = context
@@ -65,7 +53,10 @@ export function collectDeploymentContext(): DeploymentContext {
     coreArgs: {
       logsURL: `https://github.com/${owner}/${repo}/commit/${sha}/checks`,
       desc: getInput('desc'),
-      isDebug: getInput('debug') === 'true'
+      isDebug: getInput('debug') === 'true',
+      dryRun: getInput('dry_run') === 'true',
+      payload: getInput('payload') || undefined,
+      autoInactive: getInput('auto_inactive') === 'true'
     }
   }
 }

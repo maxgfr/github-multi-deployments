@@ -144,13 +144,17 @@ env|string[] or string|no|Name of deployment(s) environment for Github. Can be a
 deployment_id|string[] or string|no|Deployment(s) id(s) to update. Can be a JSON array of deployment objects or a single deployment ID. (Required for `finish`)
 env_url|string[] or string|no|Environment(s) url. Can be a JSON array string like `'["https://...", "https://..."]'` or a single URL. (For `finish` only)
 status|string|no|Status of the deployment. Valid values: `success`, `failure`, `cancelled`, `error`, `inactive`, `in_progress`, `queued`, `pending`. (For `finish` only)
+payload|string|no|JSON payload with extra information about the deployment. (For `start` only)
+auto_inactive|boolean|no|Automatically mark previous deployments as inactive via GitHub API, skipping manual deactivation. Set to `'true'` to enable. (For `start` only)
+dry_run|boolean|no|Enable dry-run mode that logs what would happen without making API calls. Set to `'true'` to enable.
 debug|boolean|no|Enable debug mode for troubleshooting. Set to `'true'` to enable.
 
 ## Outputs
 
 **Name**|**Type**|**Step**|**Description**
 -----|-----|-----|-----
-deployment_id|string|start|JSON array of deployment objects with IDs and environment URLs
+deployment_id|string|start|JSON array of deployment objects with IDs and environment information
+deployment_id|string|finish|JSON array of objects with deployment IDs and final statuses
 env|string|start|The original environment input value
 env|string|get-env|JSON array of environment names for the specified ref
 

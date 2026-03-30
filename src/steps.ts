@@ -3,13 +3,15 @@ import {DeploymentContext} from './context'
 import deactivateEnvironment from './deactivate'
 import getEnvByRef from './get-env'
 import {isValidUrl} from './url'
-import type {
-  DeploymentData,
-  DeploymentStatus,
-  FinishStepArgs,
-  GetEnvStepArgs,
-  StartStepArgs,
-  EnvStepArgs
+import {withRetry} from './retry'
+import {
+  isValidDeploymentStatus,
+  type DeploymentData,
+  type DeploymentStatus,
+  type FinishStepArgs,
+  type GetEnvStepArgs,
+  type StartStepArgs,
+  type EnvStepArgs
 } from './types'
 
 export enum Step {
@@ -25,7 +27,7 @@ export enum Step {
  * @param input - The JSON string to parse
  * @returns The parsed value as an array, or the original string if parsing fails
  */
-function parseArrayOrString(input: string): string[] {
+export function parseArrayOrString(input: string): string[] {
   try {
     const parsed = JSON.parse(input)
     if (Array.isArray(parsed) && parsed.length > 0) {
@@ -40,60 +42,80 @@ function parseArrayOrString(input: string): string[] {
 }
 
 /**
+ * Convert an unknown value to DeploymentData with validation
+ */
+function toDeploymentData(dep: unknown): DeploymentData {
+  if (typeof dep === 'string' || typeof dep === 'number') {
+    return {id: String(dep), deployment_url: ''}
+  }
+  if (typeof dep === 'object' && dep !== null) {
+    const obj = dep as Record<string, unknown>
+    if (!('id' in obj)) {
+      throw new Error(
+        `Deployment object missing required 'id' field: ${JSON.stringify(dep)}`
+      )
+    }
+    return {
+      id: String(obj.id),
+      deployment_url:
+        typeof obj.deployment_url === 'string' ? obj.deployment_url : ''
+    }
+  }
+  throw new Error(`Invalid deployment data: ${JSON.stringify(dep)}`)
+}
+
+/**
  * Safely parse deployment_id input
  * @param input - The deployment_id JSON string
  * @returns Array of deployment data objects
  */
-function parseDeploymentIds(input: string): DeploymentData[] {
+export function parseDeploymentIds(input: string): DeploymentData[] {
+  let parsed: unknown
   try {
-    const parsed = JSON.parse(input)
-
-    // Handle single value (string or number)
-    if (typeof parsed === 'string' || typeof parsed === 'number') {
-      return [{id: String(parsed), deployment_url: ''}]
-    }
-
-    // Handle array of deployment objects
-    if (Array.isArray(parsed)) {
-      return parsed.map((dep: unknown) => {
-        if (typeof dep === 'string' || typeof dep === 'number') {
-          return {id: String(dep), deployment_url: ''}
-        }
-        if (typeof dep === 'object' && dep !== null) {
-          return dep as DeploymentData
-        }
-        throw new Error(`Invalid deployment data: ${JSON.stringify(dep)}`)
-      })
-    }
-
-    // Handle single deployment object
-    if (typeof parsed === 'object' && parsed !== null) {
-      return [parsed as DeploymentData]
-    }
-
-    throw new Error(`Invalid deployment_id format: ${input}`)
-  } catch (err) {
-    throw new Error(`Failed to parse deployment_id: ${err}`)
+    parsed = JSON.parse(input)
+  } catch {
+    throw new Error(`Failed to parse deployment_id as JSON: ${input}`)
   }
+
+  // Handle single value (string or number)
+  if (typeof parsed === 'string' || typeof parsed === 'number') {
+    return [{id: String(parsed), deployment_url: ''}]
+  }
+
+  // Handle array of deployment objects
+  if (Array.isArray(parsed)) {
+    return parsed.map(toDeploymentData)
+  }
+
+  // Handle single deployment object
+  if (typeof parsed === 'object' && parsed !== null) {
+    return [toDeploymentData(parsed)]
+  }
+
+  throw new Error(`Invalid deployment_id format: ${input}`)
 }
 
 /**
- * Validate deployment status
- * @param status - The status to validate
- * @returns true if valid, false otherwise
+ * Report results from Promise.allSettled, throwing if any failed
  */
-function validateStatus(status: string): status is DeploymentStatus {
-  const validStatuses: DeploymentStatus[] = [
-    'success',
-    'failure',
-    'cancelled',
-    'error',
-    'inactive',
-    'in_progress',
-    'queued',
-    'pending'
-  ]
-  return validStatuses.includes(status as DeploymentStatus)
+function reportSettledResults(
+  results: PromiseSettledResult<unknown>[],
+  label: string
+): void {
+  const failures = results.filter(
+    (r): r is PromiseRejectedResult => r.status === 'rejected'
+  )
+  const successes = results.filter(r => r.status === 'fulfilled')
+
+  if (successes.length > 0) {
+    console.log(`${label}: ${successes.length} succeeded`)
+  }
+  if (failures.length > 0) {
+    failures.forEach((f, i) => {
+      error(`${label} failure ${i + 1}: ${f.reason}`)
+    })
+    throw new Error(`${label}: ${failures.length}/${results.length} failed`)
+  }
 }
 
 export async function run(
@@ -121,32 +143,66 @@ export async function run(
           console.log(`Environment(s) : ${environments}`)
         }
 
-        // Deactivate existing deployments and create new ones
-        const deactivatePromises = environments.map((env) =>
-          deactivateEnvironment(context, env)
+        if (args.dryRun) {
+          console.log(
+            `[dry-run] would create deployments for environments: ${environments.join(', ')}`
+          )
+          const mockOutput = environments.map((env, i) => ({
+            id: `dry-run-${i}`,
+            deployment_url: env
+          }))
+          setOutput('deployment_id', JSON.stringify(mockOutput))
+          setOutput('env', args.environment)
+          break
+        }
+
+        // Deactivate existing deployments unless auto_inactive is enabled
+        if (!args.autoInactive) {
+          const deactivateResults = await Promise.allSettled(
+            environments.map(env => deactivateEnvironment(context, env))
+          )
+          reportSettledResults(deactivateResults, 'Deactivate environments')
+        }
+
+        // Create new deployments
+        const deploymentResults = await Promise.allSettled(
+          environments.map(env =>
+            withRetry(() =>
+              github.rest.repos.createDeployment({
+                owner: context.owner,
+                repo: context.repo,
+                ref: args.gitRef,
+                required_contexts: [],
+                environment: env,
+                auto_merge: false,
+                description: args.desc,
+                transient_environment: true,
+                payload: args.payload || '',
+                ...(args.autoInactive && {auto_inactive: true})
+              })
+            )
+          )
         )
 
-        const deploymentPromises = environments.map((env) =>
-          github.rest.repos.createDeployment({
-            owner: context.owner,
-            repo: context.repo,
-            ref: args.gitRef,
-            required_contexts: [],
-            environment: env,
-            auto_merge: false,
-            description: args.desc,
-            transient_environment: true
-          })
-        )
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const deploymentsData: any[] = []
+        const failedEnvs: string[] = []
 
-        let deploymentsData: any[]
+        deploymentResults.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            deploymentsData.push(result.value)
+          } else {
+            failedEnvs.push(environments[index])
+            error(
+              `Failed to create deployment for env ${environments[index]}: ${result.reason}`
+            )
+          }
+        })
 
-        try {
-          await Promise.all(deactivatePromises)
-          deploymentsData = await Promise.all(deploymentPromises)
-        } catch (err) {
-          error(`Cannot generate deployments: ${err}`)
-          throw err
+        if (failedEnvs.length > 0) {
+          throw new Error(
+            `Failed to create deployments for: ${failedEnvs.join(', ')}`
+          )
         }
 
         if (args.isDebug) {
@@ -155,42 +211,45 @@ export async function run(
         }
 
         // Create deployment status for each deployment
-        const statusPromises = deploymentsData.map((deployment: any) =>
-          github.rest.repos.createDeploymentStatus({
-            owner: context.owner,
-            repo: context.repo,
-            deployment_id: parseInt(String(deployment.data.id), 10),
-            state: 'in_progress',
-            ref: context.ref,
-            description: args.desc,
-            log_url: args.logsURL
-          })
-        )
-
-        try {
-          await Promise.all(statusPromises)
-          setOutput(
-            'deployment_id',
-            JSON.stringify(
-              deploymentsData.map((deployment: any, index: number) => ({
-                ...deployment.data,
-                deployment_url: environments[index]
-              }))
+        const statusResults = await Promise.allSettled(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          deploymentsData.map((deployment: any) =>
+            withRetry(() =>
+              github.rest.repos.createDeploymentStatus({
+                owner: context.owner,
+                repo: context.repo,
+                deployment_id: parseInt(String(deployment.data.id), 10),
+                state: 'in_progress',
+                ref: context.ref,
+                description: args.desc,
+                log_url: args.logsURL
+              })
             )
           )
-          setOutput('env', args.environment)
-        } catch (err) {
-          console.log(err)
-          error(`Cannot generate deployment status: ${err}`)
-          throw err
-        }
+        )
+
+        reportSettledResults(statusResults, 'Create deployment statuses')
+
+        setOutput(
+          'deployment_id',
+          JSON.stringify(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            deploymentsData.map((deployment: any, index: number) => ({
+              ...deployment.data,
+              deployment_url: environments[index]
+            }))
+          )
+        )
+        setOutput('env', args.environment)
         break
       }
 
       case Step.Finish: {
         const args: FinishStepArgs = {
           ...context.coreArgs,
-          status: getInput('status', {required: true}).toLowerCase() as DeploymentStatus,
+          status: getInput('status', {
+            required: true
+          }).toLowerCase() as DeploymentStatus,
           deployment: getInput('deployment_id', {required: true}),
           envURL: getInput('env_url', {required: false})
         }
@@ -205,7 +264,7 @@ export async function run(
           environmentsUrl = parseArrayOrString(args.envURL)
         }
 
-        if (!validateStatus(args.status)) {
+        if (!isValidDeploymentStatus(args.status)) {
           error(`unexpected status ${args.status}`)
           throw new Error(`Invalid status: ${args.status}`)
         }
@@ -228,40 +287,56 @@ export async function run(
           )
         }
 
-        const promises = deployments.map(async (dep, i) =>
-          github.rest.repos.createDeploymentStatus({
-            owner: context.owner,
-            repo: context.repo,
-            deployment_id: parseInt(dep.id, 10),
-            state: newStatus,
-            ref: context.ref,
-            description: args.desc,
-            environment_url:
-              newStatus === 'success'
-                ? environmentsUrl
-                  ? environmentsUrl[i]
-                  : isValidUrl(dep.deployment_url)
-                  ? dep.deployment_url
-                  : ''
-                : '',
-            log_url: args.logsURL
-          })
+        if (args.dryRun) {
+          console.log(
+            `[dry-run] would set status "${newStatus}" for ${deployments.length} deployment(s)`
+          )
+          setOutput(
+            'deployment_id',
+            JSON.stringify(
+              deployments.map(dep => ({id: dep.id, status: newStatus}))
+            )
+          )
+          break
+        }
+
+        const results = await Promise.allSettled(
+          deployments.map((dep, i) =>
+            withRetry(() =>
+              github.rest.repos.createDeploymentStatus({
+                owner: context.owner,
+                repo: context.repo,
+                deployment_id: parseInt(dep.id, 10),
+                state: newStatus,
+                ref: context.ref,
+                description: args.desc,
+                environment_url:
+                  newStatus === 'success' && environmentsUrl
+                    ? environmentsUrl[i]
+                    : newStatus === 'success' && isValidUrl(dep.deployment_url)
+                      ? dep.deployment_url
+                      : '',
+                log_url: args.logsURL
+              })
+            )
+          )
         )
 
-        try {
-          await Promise.all(promises)
-        } catch (err) {
-          console.log(err)
-          error(`Cannot generate deployment status: ${err}`)
-          throw err
-        }
+        reportSettledResults(results, 'Update deployment statuses')
+
+        setOutput(
+          'deployment_id',
+          JSON.stringify(
+            deployments.map(dep => ({id: dep.id, status: newStatus}))
+          )
+        )
         break
       }
 
       case Step.DeactivateEnv: {
         const args: EnvStepArgs = {
           ...context.coreArgs,
-          environment: getInput('env', {required: false})
+          environment: getInput('env', {required: true})
         }
 
         if (args.isDebug) {
@@ -270,24 +345,25 @@ export async function run(
 
         const environments = parseArrayOrString(args.environment)
 
-        const promises = environments.map((env) =>
-          deactivateEnvironment(context, env)
+        if (args.dryRun) {
+          console.log(
+            `[dry-run] would deactivate environments: ${environments.join(', ')}`
+          )
+          break
+        }
+
+        const results = await Promise.allSettled(
+          environments.map(env => deactivateEnvironment(context, env))
         )
 
-        try {
-          await Promise.all(promises)
-        } catch (err) {
-          console.log(err)
-          error(`Cannot deactivate deployment status: ${err}`)
-          throw err
-        }
+        reportSettledResults(results, 'Deactivate environments')
         break
       }
 
       case Step.DeleteEnv: {
         const args: EnvStepArgs = {
           ...context.coreArgs,
-          environment: getInput('env', {required: false})
+          environment: getInput('env', {required: true})
         }
 
         if (args.isDebug) {
@@ -296,21 +372,26 @@ export async function run(
 
         const environments = parseArrayOrString(args.environment)
 
-        const promises = environments.map((env) =>
-          github.rest.repos.deleteAnEnvironment({
-            owner: context.owner,
-            repo: context.repo,
-            environment_name: env
-          })
+        if (args.dryRun) {
+          console.log(
+            `[dry-run] would delete environments: ${environments.join(', ')}`
+          )
+          break
+        }
+
+        const results = await Promise.allSettled(
+          environments.map(env =>
+            withRetry(() =>
+              github.rest.repos.deleteAnEnvironment({
+                owner: context.owner,
+                repo: context.repo,
+                environment_name: env
+              })
+            )
+          )
         )
 
-        try {
-          await Promise.all(promises)
-        } catch (err) {
-          console.log(err)
-          error(`Cannot delete env: ${err}`)
-          throw err
-        }
+        reportSettledResults(results, 'Delete environments')
         break
       }
 
@@ -331,13 +412,7 @@ export async function run(
           console.log(env)
         }
 
-        try {
-          setOutput('env', JSON.stringify(env))
-        } catch (err) {
-          console.log(err)
-          error(`Cannot generate deployment status: ${err}`)
-          throw err
-        }
+        setOutput('env', JSON.stringify(env))
         break
       }
 

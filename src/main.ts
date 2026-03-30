@@ -11,9 +11,17 @@ async function main(): Promise<void> {
     const context = collectDeploymentContext()
     console.log(`targeting ${context.owner}/${context.repo}`)
 
-    const step = core.getInput('step', {required: true}) as Step
+    const stepInput = core.getInput('step', {required: true})
+    const validSteps = Object.values(Step) as string[]
 
-    await run(step, context)
+    if (!validSteps.includes(stepInput)) {
+      core.setFailed(
+        `Invalid step "${stepInput}". Must be one of: ${validSteps.join(', ')}`
+      )
+      return
+    }
+
+    await run(stepInput as Step, context)
   } catch (error) {
     core.setFailed(`Action failed: ${error}`)
     throw error

@@ -44,43 +44,47 @@ export type DeploymentStatus =
   | 'pending'
 
 /**
+ * Core arguments shared across all steps
+ */
+export interface CoreArgs {
+  logsURL: string
+  desc?: string
+  isDebug: boolean
+  dryRun: boolean
+  payload?: string
+  autoInactive: boolean
+}
+
+/**
  * Arguments for the start step
  */
-export interface StartStepArgs {
+export interface StartStepArgs extends CoreArgs {
   environment: string
   override?: string
   gitRef: string
-  desc?: string
-  logsURL: string
-  isDebug: boolean
 }
 
 /**
  * Arguments for the finish step
  */
-export interface FinishStepArgs {
+export interface FinishStepArgs extends CoreArgs {
   status: DeploymentStatus
   deployment: string
   envURL?: string
-  desc?: string
-  logsURL: string
-  isDebug: boolean
 }
 
 /**
  * Arguments for environment operations (deactivate/delete)
  */
-export interface EnvStepArgs {
+export interface EnvStepArgs extends CoreArgs {
   environment: string
-  isDebug: boolean
 }
 
 /**
  * Arguments for get-env step
  */
-export interface GetEnvStepArgs {
+export interface GetEnvStepArgs extends CoreArgs {
   gitRef: string
-  isDebug: boolean
 }
 
 /**
@@ -91,7 +95,9 @@ export type EnvironmentInput = string | string[]
 /**
  * Helper function to check if a value is a valid deployment status
  */
-export function isValidDeploymentStatus(status: string): status is DeploymentStatus {
+export function isValidDeploymentStatus(
+  status: string
+): status is DeploymentStatus {
   return [
     'success',
     'failure',
