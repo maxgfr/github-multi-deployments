@@ -6,6 +6,10 @@ on:
     branches:
       - main
 
+env:
+  # Unique suffix per run to avoid conflicts with historical deployments
+  ENV_SUFFIX: ${{ github.run_id }}
+
 jobs:
   action:
     runs-on: ubuntu-latest
@@ -36,7 +40,8 @@ jobs:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
           desc: 'Single env test'
-          env: envSingle
+          env: env-${{ env.ENV_SUFFIX }}-single
+          auto_inactive: 'true'
           debug: true
 
       - name: 'Verify: start output'
@@ -73,7 +78,8 @@ jobs:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
           desc: 'Multi-env test'
-          env: '["envMultiA", "envMultiB"]'
+          env: '["env-${{ env.ENV_SUFFIX }}-multiA", "env-${{ env.ENV_SUFFIX }}-multiB"]'
+          auto_inactive: 'true'
           debug: true
 
       - name: 'Test: finish (multi-env with env_url)'
@@ -92,7 +98,7 @@ jobs:
         with:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
-          env: '["envMultiA", "envMultiB"]'
+          env: '["env-${{ env.ENV_SUFFIX }}-multiA", "env-${{ env.ENV_SUFFIX }}-multiB"]'
           debug: true
 
       - name: 'Test: get-env'
@@ -117,7 +123,8 @@ jobs:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
           desc: 'Single string env test'
-          env: envStringZ
+          env: env-${{ env.ENV_SUFFIX }}-string
+          auto_inactive: 'true'
           debug: true
 
       - name: 'Test: deactivate-env (single string)'
@@ -125,7 +132,7 @@ jobs:
         with:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
-          env: envStringZ
+          env: env-${{ env.ENV_SUFFIX }}-string
           debug: true
 
       # ─── New features: payload, auto_inactive, production, transient ─
@@ -136,7 +143,7 @@ jobs:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
           desc: 'New features test'
-          env: envFeatures
+          env: env-${{ env.ENV_SUFFIX }}-features
           payload: '{"version": "2.0.0", "deployer": "ci"}'
           auto_inactive: 'true'
           transient_environment: 'false'
@@ -160,8 +167,9 @@ jobs:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
           desc: 'Custom log URL test'
-          env: envLogUrl
+          env: env-${{ env.ENV_SUFFIX }}-logurl
           log_url: 'https://my-dashboard.example.com/logs/run-123'
+          auto_inactive: 'true'
           debug: true
 
       - name: 'Test: finish (custom log_url)'
@@ -182,7 +190,7 @@ jobs:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
           desc: 'Dry-run test'
-          env: '["envDryA", "envDryB"]'
+          env: '["env-${{ env.ENV_SUFFIX }}-dryA", "env-${{ env.ENV_SUFFIX }}-dryB"]'
           dry_run: 'true'
           debug: true
 
@@ -207,7 +215,7 @@ jobs:
         with:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
-          env: envDryA
+          env: env-${{ env.ENV_SUFFIX }}-dryA
           dry_run: 'true'
           debug: true
 
@@ -216,11 +224,11 @@ jobs:
         with:
           step: delete-env
           token: ${{ secrets.GITHUB_TOKEN }}
-          env: envDryA
+          env: env-${{ env.ENV_SUFFIX }}-dryA
           dry_run: 'true'
           debug: true
 
-      # ─── Cleanup: deactivate all test environments ──────────────────
+      # ─── Cleanup ────────────────────────────────────────────────────
       - name: Cleanup test environments
         if: always()
         continue-on-error: true
@@ -228,7 +236,7 @@ jobs:
         with:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
-          env: '["envSingle", "envMultiA", "envMultiB", "envStringZ", "envFeatures", "envLogUrl"]'
+          env: '["env-${{ env.ENV_SUFFIX }}-single", "env-${{ env.ENV_SUFFIX }}-multiA", "env-${{ env.ENV_SUFFIX }}-multiB", "env-${{ env.ENV_SUFFIX }}-string", "env-${{ env.ENV_SUFFIX }}-features", "env-${{ env.ENV_SUFFIX }}-logurl"]'
 
   delete-env:
     name: Delete environment (requires PAT)
@@ -259,7 +267,8 @@ jobs:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
           desc: 'Delete env test'
-          env: envToDelete
+          env: env-${{ github.run_id }}-delete
+          auto_inactive: 'true'
           debug: true
 
       - name: 'Test: delete-env'
@@ -268,5 +277,5 @@ jobs:
         with:
           step: delete-env
           token: ${{ secrets.GH_PAT_TOKEN }}
-          env: envToDelete
+          env: env-${{ github.run_id }}-delete
           debug: true
