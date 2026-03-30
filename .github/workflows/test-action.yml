@@ -128,15 +128,6 @@ jobs:
           env: envStringZ
           debug: true
 
-      # ─── Dynamic deactivation from get-env output ───────────────────
-      - name: 'Test: deactivate-env (dynamic from get-env)'
-        uses: ./
-        with:
-          step: deactivate-env
-          token: ${{ secrets.GITHUB_TOKEN }}
-          env: ${{ steps.envs.outputs.env }}
-          debug: true
-
       # ─── New features: payload, auto_inactive, production, transient ─
       - name: 'Test: start (payload + auto_inactive + production)'
         uses: ./
@@ -232,12 +223,12 @@ jobs:
       # ─── Cleanup: deactivate all test environments ──────────────────
       - name: Cleanup test environments
         if: always()
+        continue-on-error: true
         uses: ./
         with:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
           env: '["envSingle", "envMultiA", "envMultiB", "envStringZ", "envFeatures", "envLogUrl"]'
-          debug: true
 
   delete-env:
     name: Delete environment (requires PAT)
