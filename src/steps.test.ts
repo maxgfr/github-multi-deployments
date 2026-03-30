@@ -11,6 +11,7 @@ jest.mock('@actions/core', () => ({
   getInput: jest.fn(),
   setOutput: jest.fn(),
   error: jest.fn(),
+  warning: jest.fn(),
   setFailed: jest.fn(),
   summary: mockSummary
 }))
@@ -93,6 +94,7 @@ function createMockContext(
       autoInactive: false,
       transientEnvironment: true,
       productionEnvironment: false,
+      continueOnError: false,
       ...overrides.coreArgs
     }
   } as DeploymentContext
@@ -480,6 +482,81 @@ describe('steps', () => {
         })
       )
     })
+
+    it('should continue with successful envs when continueOnError is true and some deployments fail', async () => {
+      const mockGithub = createMockGithub()
+      let callCount = 0
+      mockGithub.rest.repos.createDeployment.mockImplementation(async () => {
+        callCount++
+        if (callCount === 1) throw new Error('env1 failed')
+        return {
+          data: {id: callCount, sha: 'abc', ref: 'main', environment: 'test'}
+        }
+      })
+      const context = createMockContext({
+        github: mockGithub,
+        coreArgs: {continueOnError: true}
+      })
+      mockInputs({env: '["envA", "envB"]', ref: 'main'})
+
+      await run(Step.Start, context)
+
+      // Should NOT fail - continues with successful deployment
+      expect(mockSetFailed).not.toHaveBeenCalled()
+      expect(
+        mockGithub.rest.repos.createDeploymentStatus
+      ).toHaveBeenCalledTimes(1)
+      expect(mockSetOutput).toHaveBeenCalledWith(
+        'deployment_id',
+        expect.any(String)
+      )
+    })
+
+    it('should still fail when ALL deployments fail even with continueOnError', async () => {
+      const mockGithub = createMockGithub()
+      mockGithub.rest.repos.createDeployment.mockRejectedValue(
+        new Error('all fail')
+      )
+      const context = createMockContext({
+        github: mockGithub,
+        coreArgs: {continueOnError: true}
+      })
+      mockInputs({env: '["envA", "envB"]', ref: 'main'})
+
+      await run(Step.Start, context)
+
+      expect(mockSetFailed).toHaveBeenCalled()
+    })
+
+    it('should warn but continue deactivation with continueOnError', async () => {
+      ;(deactivateEnvironment as jest.Mock).mockRejectedValueOnce(
+        new Error('deactivation failed')
+      )
+      const mockGithub = createMockGithub()
+      const context = createMockContext({
+        github: mockGithub,
+        coreArgs: {continueOnError: true}
+      })
+      mockInputs({env: 'staging', ref: 'main'})
+
+      await run(Step.Start, context)
+
+      // Should NOT fail - continue_on_error means deactivation failure is a warning
+      expect(mockSetFailed).not.toHaveBeenCalled()
+      expect(mockGithub.rest.repos.createDeployment).toHaveBeenCalled()
+    })
+
+    it('should fail on partial deactivation failure without continueOnError', async () => {
+      ;(deactivateEnvironment as jest.Mock)
+        .mockRejectedValueOnce(new Error('env1 deactivation failed'))
+        .mockResolvedValueOnce({environment: 'env2', count: 0})
+      const context = createMockContext()
+      mockInputs({env: '["env1", "env2"]', ref: 'main'})
+
+      await run(Step.Start, context)
+
+      expect(mockSetFailed).toHaveBeenCalled()
+    })
   })
 
   describe('run - Finish step', () => {
@@ -677,6 +754,43 @@ describe('steps', () => {
       await run(Step.Finish, context)
 
       expect(mockSetFailed).toHaveBeenCalled()
+    })
+
+    it('should handle mixed-case status input', async () => {
+      const mockGithub = createMockGithub()
+      const context = createMockContext({github: mockGithub})
+
+      mockInputs({
+        status: 'SUCCESS',
+        deployment_id: JSON.stringify([{id: '1', deployment_url: ''}])
+      })
+
+      await run(Step.Finish, context)
+
+      expect(mockGithub.rest.repos.createDeploymentStatus).toHaveBeenCalledWith(
+        expect.objectContaining({state: 'success'})
+      )
+    })
+
+    it('should warn but continue with continueOnError when status update fails', async () => {
+      const mockGithub = createMockGithub()
+      mockGithub.rest.repos.createDeploymentStatus.mockRejectedValue(
+        new Error('API error')
+      )
+      const context = createMockContext({
+        github: mockGithub,
+        coreArgs: {continueOnError: true}
+      })
+
+      mockInputs({
+        status: 'success',
+        deployment_id: JSON.stringify([{id: '1', deployment_url: ''}])
+      })
+
+      await run(Step.Finish, context)
+
+      // Should NOT fail - continueOnError turns errors into warnings
+      expect(mockSetFailed).not.toHaveBeenCalled()
     })
 
     it('should write job summary with status and URLs', async () => {

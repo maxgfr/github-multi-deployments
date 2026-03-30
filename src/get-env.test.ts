@@ -31,7 +31,8 @@ function createMockContext(): DeploymentContext {
       payload: undefined,
       autoInactive: false,
       transientEnvironment: true,
-      productionEnvironment: false
+      productionEnvironment: false,
+      continueOnError: false
     }
   }
 }

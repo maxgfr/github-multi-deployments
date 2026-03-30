@@ -43,7 +43,8 @@ function collectDeploymentContext() {
             payload: (0, core_1.getInput)('payload') || undefined,
             autoInactive: (0, core_1.getInput)('auto_inactive') === 'true',
             transientEnvironment: (0, core_1.getInput)('transient_environment') !== 'false',
-            productionEnvironment: (0, core_1.getInput)('production_environment') === 'true'
+            productionEnvironment: (0, core_1.getInput)('production_environment') === 'true',
+            continueOnError: (0, core_1.getInput)('continue_on_error') === 'true'
         }
     };
 }
@@ -354,14 +355,14 @@ function toDeploymentData(dep) {
     if (typeof dep === 'object' && dep !== null) {
         const obj = dep;
         if (!('id' in obj)) {
-            throw new Error(`Deployment object missing required 'id' field: ${JSON.stringify(dep)}`);
+            throw new Error(`Deployment object missing required 'id' field: ${JSON.stringify(dep)}. Expected format: {"id": "123"} or {"id": "123", "deployment_url": "https://..."}`);
         }
         return {
             id: String(obj.id),
             deployment_url: typeof obj.deployment_url === 'string' ? obj.deployment_url : ''
         };
     }
-    throw new Error(`Invalid deployment data: ${JSON.stringify(dep)}`);
+    throw new Error(`Invalid deployment data: ${JSON.stringify(dep)}. Expected a number, string, or object with an 'id' field.`);
 }
 /**
  * Safely parse deployment_id input
@@ -374,7 +375,7 @@ function parseDeploymentIds(input) {
         parsed = JSON.parse(input);
     }
     catch (_a) {
-        throw new Error(`Failed to parse deployment_id as JSON: ${input}`);
+        throw new Error(`Failed to parse deployment_id as JSON: ${input}. Expected a number, JSON array, or JSON object.`);
     }
     // Handle single value (string or number)
     if (typeof parsed === 'string' || typeof parsed === 'number') {
@@ -388,23 +389,31 @@ function parseDeploymentIds(input) {
     if (typeof parsed === 'object' && parsed !== null) {
         return [toDeploymentData(parsed)];
     }
-    throw new Error(`Invalid deployment_id format: ${input}`);
+    throw new Error(`Invalid deployment_id format: ${input}. Expected a number, JSON array, or JSON object.`);
 }
 /**
- * Report results from Promise.allSettled, throwing if any failed
+ * Report results from Promise.allSettled.
+ * @param throwOnFailure - When true (default), throws if any failed. When false, logs warnings instead.
+ * @returns true if all succeeded, false if some failed
  */
-function reportSettledResults(results, label) {
+function reportSettledResults(results, label, throwOnFailure = true) {
     const failures = results.filter((r) => r.status === 'rejected');
     const successes = results.filter(r => r.status === 'fulfilled');
     if (successes.length > 0) {
         console.log(`${label}: ${successes.length} succeeded`);
     }
     if (failures.length > 0) {
+        const msg = `${label}: ${failures.length}/${results.length} failed`;
         failures.forEach((f, i) => {
             (0, core_1.error)(`${label} failure ${i + 1}: ${f.reason}`);
         });
-        throw new Error(`${label}: ${failures.length}/${results.length} failed`);
+        if (throwOnFailure) {
+            throw new Error(msg);
+        }
+        (0, core_1.warning)(msg);
+        return false;
     }
+    return true;
 }
 function run(step, context) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -443,11 +452,10 @@ function run(step, context) {
                     // Deactivate existing deployments unless auto_inactive is enabled
                     if (!args.autoInactive) {
                         const deactivateResults = yield Promise.allSettled(environments.map(env => (0, deactivate_1.default)(context, env)));
-                        reportSettledResults(deactivateResults, 'Deactivate environments');
+                        reportSettledResults(deactivateResults, 'Deactivate environments', !args.continueOnError);
                     }
                     // Create new deployments
                     const deploymentResults = yield Promise.allSettled(environments.map(env => (0, retry_1.withRetry)(() => github.rest.repos.createDeployment(Object.assign({ owner: context.owner, repo: context.repo, ref: args.gitRef, required_contexts: [], environment: env, auto_merge: false, description: args.desc, transient_environment: args.transientEnvironment, production_environment: args.productionEnvironment, payload: args.payload || '' }, (args.autoInactive && { auto_inactive: true }))))));
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const deploymentsData = [];
                     const failedEnvs = [];
                     deploymentResults.forEach((result, index) => {
@@ -460,27 +468,30 @@ function run(step, context) {
                         }
                     });
                     if (failedEnvs.length > 0) {
-                        throw new Error(`Failed to create deployments for: ${failedEnvs.join(', ')}`);
+                        if (args.continueOnError && deploymentsData.length > 0) {
+                            (0, core_1.warning)(`Partial failure: could not create deployments for: ${failedEnvs.join(', ')}`);
+                        }
+                        else {
+                            throw new Error(`Failed to create deployments for: ${failedEnvs.join(', ')}`);
+                        }
                     }
                     if (args.isDebug) {
                         console.log('Deployments data');
                         console.log(deploymentsData);
                     }
                     // Create deployment status for each deployment
-                    const statusResults = yield Promise.allSettled(
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    deploymentsData.map((deployment) => (0, retry_1.withRetry)(() => github.rest.repos.createDeploymentStatus({
+                    const statusResults = yield Promise.allSettled(deploymentsData.map(deployment => (0, retry_1.withRetry)(() => github.rest.repos.createDeploymentStatus({
                         owner: context.owner,
                         repo: context.repo,
-                        deployment_id: parseInt(String(deployment.data.id), 10),
+                        deployment_id: deployment.data.id,
                         state: 'in_progress',
                         description: args.desc,
                         log_url: args.logsURL
                     }))));
-                    reportSettledResults(statusResults, 'Create deployment statuses');
-                    (0, core_1.setOutput)('deployment_id', JSON.stringify(
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment.data), { deployment_url: environments[index] })))));
+                    reportSettledResults(statusResults, 'Create deployment statuses', !args.continueOnError);
+                    // Map successful deployments back to their environment names
+                    const successfulEnvs = environments.filter(env => !failedEnvs.includes(env));
+                    (0, core_1.setOutput)('deployment_id', JSON.stringify(deploymentsData.map((deployment, index) => (Object.assign(Object.assign({}, deployment.data), { deployment_url: successfulEnvs[index] })))));
                     (0, core_1.setOutput)('env', args.environment);
                     yield core_1.summary
                         .addHeading('Deployment Started', 3)
@@ -490,9 +501,8 @@ function run(step, context) {
                             { data: 'ID', header: true },
                             { data: 'Ref', header: true }
                         ],
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         ...deploymentsData.map((d, i) => [
-                            environments[i],
+                            successfulEnvs[i],
                             String(d.data.id),
                             args.gitRef
                         ])
@@ -518,7 +528,7 @@ function run(step, context) {
                     }
                     if (!(0, types_1.isValidDeploymentStatus)(args.status)) {
                         (0, core_1.error)(`unexpected status ${args.status}`);
-                        throw new Error(`Invalid status: ${args.status}`);
+                        throw new Error(`Invalid status: "${args.status}". Valid values: success, failure, cancelled, error, inactive, in_progress, queued, pending`);
                     }
                     if (args.isDebug) {
                         console.log(`finishing deployment for ${args.deployment} with status ${args.status}`);
@@ -557,7 +567,7 @@ function run(step, context) {
                                 : '',
                         log_url: args.logsURL
                     }))));
-                    reportSettledResults(results, 'Update deployment statuses');
+                    reportSettledResults(results, 'Update deployment statuses', !args.continueOnError);
                     (0, core_1.setOutput)('deployment_id', JSON.stringify(deployments.map(dep => ({ id: dep.id, status: newStatus }))));
                     yield core_1.summary
                         .addHeading(`Deployment Finished (${newStatus})`, 3)
@@ -591,7 +601,7 @@ function run(step, context) {
                         break;
                     }
                     const results = yield Promise.allSettled(environments.map(env => (0, deactivate_1.default)(context, env)));
-                    reportSettledResults(results, 'Deactivate environments');
+                    reportSettledResults(results, 'Deactivate environments', !args.continueOnError);
                     yield core_1.summary
                         .addHeading('Environments Deactivated', 3)
                         .addRaw(environments.join(', '))
@@ -617,7 +627,7 @@ function run(step, context) {
                         repo: context.repo,
                         environment_name: env
                     }))));
-                    reportSettledResults(deleteResults, 'Delete environments');
+                    reportSettledResults(deleteResults, 'Delete environments', !args.continueOnError);
                     yield core_1.summary
                         .addHeading('Environments Deleted', 3)
                         .addRaw(environments.join(', '))

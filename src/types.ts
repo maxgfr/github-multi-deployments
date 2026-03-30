@@ -55,6 +55,21 @@ export interface CoreArgs {
   autoInactive: boolean
   transientEnvironment: boolean
   productionEnvironment: boolean
+  continueOnError: boolean
+}
+
+/**
+ * Response from GitHub API createDeployment
+ */
+export interface CreateDeploymentResponse {
+  data: {
+    id: number
+    sha: string
+    ref: string
+    environment: string
+    description?: string
+    [key: string]: unknown
+  }
 }
 
 /**

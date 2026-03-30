@@ -36,6 +36,7 @@ function createMockContext(
       autoInactive: false,
       transientEnvironment: true,
       productionEnvironment: false,
+      continueOnError: false,
       ...coreArgsOverrides
     }
   }

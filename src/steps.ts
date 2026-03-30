@@ -1,4 +1,11 @@
-import {getInput, setOutput, error, setFailed, summary} from '@actions/core'
+import {
+  getInput,
+  setOutput,
+  error,
+  warning,
+  setFailed,
+  summary
+} from '@actions/core'
 import {DeploymentContext} from './context'
 import deactivateEnvironment from './deactivate'
 import getEnvByRef from './get-env'
@@ -6,6 +13,7 @@ import {isValidUrl} from './url'
 import {withRetry} from './retry'
 import {
   isValidDeploymentStatus,
+  type CreateDeploymentResponse,
   type DeploymentData,
   type DeploymentStatus,
   type FinishStepArgs,
@@ -52,7 +60,7 @@ function toDeploymentData(dep: unknown): DeploymentData {
     const obj = dep as Record<string, unknown>
     if (!('id' in obj)) {
       throw new Error(
-        `Deployment object missing required 'id' field: ${JSON.stringify(dep)}`
+        `Deployment object missing required 'id' field: ${JSON.stringify(dep)}. Expected format: {"id": "123"} or {"id": "123", "deployment_url": "https://..."}`
       )
     }
     return {
@@ -61,7 +69,9 @@ function toDeploymentData(dep: unknown): DeploymentData {
         typeof obj.deployment_url === 'string' ? obj.deployment_url : ''
     }
   }
-  throw new Error(`Invalid deployment data: ${JSON.stringify(dep)}`)
+  throw new Error(
+    `Invalid deployment data: ${JSON.stringify(dep)}. Expected a number, string, or object with an 'id' field.`
+  )
 }
 
 /**
@@ -74,7 +84,9 @@ export function parseDeploymentIds(input: string): DeploymentData[] {
   try {
     parsed = JSON.parse(input)
   } catch {
-    throw new Error(`Failed to parse deployment_id as JSON: ${input}`)
+    throw new Error(
+      `Failed to parse deployment_id as JSON: ${input}. Expected a number, JSON array, or JSON object.`
+    )
   }
 
   // Handle single value (string or number)
@@ -92,16 +104,21 @@ export function parseDeploymentIds(input: string): DeploymentData[] {
     return [toDeploymentData(parsed)]
   }
 
-  throw new Error(`Invalid deployment_id format: ${input}`)
+  throw new Error(
+    `Invalid deployment_id format: ${input}. Expected a number, JSON array, or JSON object.`
+  )
 }
 
 /**
- * Report results from Promise.allSettled, throwing if any failed
+ * Report results from Promise.allSettled.
+ * @param throwOnFailure - When true (default), throws if any failed. When false, logs warnings instead.
+ * @returns true if all succeeded, false if some failed
  */
 function reportSettledResults(
   results: PromiseSettledResult<unknown>[],
-  label: string
-): void {
+  label: string,
+  throwOnFailure = true
+): boolean {
   const failures = results.filter(
     (r): r is PromiseRejectedResult => r.status === 'rejected'
   )
@@ -111,11 +128,17 @@ function reportSettledResults(
     console.log(`${label}: ${successes.length} succeeded`)
   }
   if (failures.length > 0) {
+    const msg = `${label}: ${failures.length}/${results.length} failed`
     failures.forEach((f, i) => {
       error(`${label} failure ${i + 1}: ${f.reason}`)
     })
-    throw new Error(`${label}: ${failures.length}/${results.length} failed`)
+    if (throwOnFailure) {
+      throw new Error(msg)
+    }
+    warning(msg)
+    return false
   }
+  return true
 }
 
 export async function run(
@@ -170,7 +193,11 @@ export async function run(
           const deactivateResults = await Promise.allSettled(
             environments.map(env => deactivateEnvironment(context, env))
           )
-          reportSettledResults(deactivateResults, 'Deactivate environments')
+          reportSettledResults(
+            deactivateResults,
+            'Deactivate environments',
+            !args.continueOnError
+          )
         }
 
         // Create new deployments
@@ -194,13 +221,12 @@ export async function run(
           )
         )
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const deploymentsData: any[] = []
+        const deploymentsData: CreateDeploymentResponse[] = []
         const failedEnvs: string[] = []
 
         deploymentResults.forEach((result, index) => {
           if (result.status === 'fulfilled') {
-            deploymentsData.push(result.value)
+            deploymentsData.push(result.value as CreateDeploymentResponse)
           } else {
             failedEnvs.push(environments[index])
             error(
@@ -210,9 +236,15 @@ export async function run(
         })
 
         if (failedEnvs.length > 0) {
-          throw new Error(
-            `Failed to create deployments for: ${failedEnvs.join(', ')}`
-          )
+          if (args.continueOnError && deploymentsData.length > 0) {
+            warning(
+              `Partial failure: could not create deployments for: ${failedEnvs.join(', ')}`
+            )
+          } else {
+            throw new Error(
+              `Failed to create deployments for: ${failedEnvs.join(', ')}`
+            )
+          }
         }
 
         if (args.isDebug) {
@@ -222,13 +254,12 @@ export async function run(
 
         // Create deployment status for each deployment
         const statusResults = await Promise.allSettled(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          deploymentsData.map((deployment: any) =>
+          deploymentsData.map(deployment =>
             withRetry(() =>
               github.rest.repos.createDeploymentStatus({
                 owner: context.owner,
                 repo: context.repo,
-                deployment_id: parseInt(String(deployment.data.id), 10),
+                deployment_id: deployment.data.id,
                 state: 'in_progress',
                 description: args.desc,
                 log_url: args.logsURL
@@ -237,15 +268,23 @@ export async function run(
           )
         )
 
-        reportSettledResults(statusResults, 'Create deployment statuses')
+        reportSettledResults(
+          statusResults,
+          'Create deployment statuses',
+          !args.continueOnError
+        )
+
+        // Map successful deployments back to their environment names
+        const successfulEnvs = environments.filter(
+          env => !failedEnvs.includes(env)
+        )
 
         setOutput(
           'deployment_id',
           JSON.stringify(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            deploymentsData.map((deployment: any, index: number) => ({
+            deploymentsData.map((deployment, index) => ({
               ...deployment.data,
-              deployment_url: environments[index]
+              deployment_url: successfulEnvs[index]
             }))
           )
         )
@@ -258,9 +297,8 @@ export async function run(
               {data: 'ID', header: true},
               {data: 'Ref', header: true}
             ],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ...deploymentsData.map((d: any, i: number) => [
-              environments[i],
+            ...deploymentsData.map((d, i) => [
+              successfulEnvs[i],
               String(d.data.id),
               args.gitRef
             ])
@@ -298,7 +336,9 @@ export async function run(
 
         if (!isValidDeploymentStatus(args.status)) {
           error(`unexpected status ${args.status}`)
-          throw new Error(`Invalid status: ${args.status}`)
+          throw new Error(
+            `Invalid status: "${args.status}". Valid values: success, failure, cancelled, error, inactive, in_progress, queued, pending`
+          )
         }
 
         if (args.isDebug) {
@@ -363,7 +403,11 @@ export async function run(
           )
         )
 
-        reportSettledResults(results, 'Update deployment statuses')
+        reportSettledResults(
+          results,
+          'Update deployment statuses',
+          !args.continueOnError
+        )
 
         setOutput(
           'deployment_id',
@@ -416,7 +460,11 @@ export async function run(
           environments.map(env => deactivateEnvironment(context, env))
         )
 
-        reportSettledResults(results, 'Deactivate environments')
+        reportSettledResults(
+          results,
+          'Deactivate environments',
+          !args.continueOnError
+        )
         await summary
           .addHeading('Environments Deactivated', 3)
           .addRaw(environments.join(', '))
@@ -459,7 +507,11 @@ export async function run(
           )
         )
 
-        reportSettledResults(deleteResults, 'Delete environments')
+        reportSettledResults(
+          deleteResults,
+          'Delete environments',
+          !args.continueOnError
+        )
         await summary
           .addHeading('Environments Deleted', 3)
           .addRaw(environments.join(', '))

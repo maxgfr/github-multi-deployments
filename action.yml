@@ -54,6 +54,10 @@ inputs:
     required: false
     description: "Mark the deployment as a production environment. Set to 'true' to enable. Default: 'false'."
     default: 'false'
+  continue_on_error:
+    required: false
+    description: "Continue deploying to other environments when one fails (multi-env). Partial successes are output with warnings. Default: 'false'."
+    default: 'false'
   dry_run:
     required: false
     description: "Enable dry-run mode. Logs what would happen without making API calls. Set to 'true' to enable."

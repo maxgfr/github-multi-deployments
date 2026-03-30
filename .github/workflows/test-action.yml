@@ -182,6 +182,35 @@ jobs:
           log_url: 'https://my-dashboard.example.com/logs/run-123'
           debug: true
 
+      # ─── Continue on error (multi-env partial failure) ──────────────
+      - name: 'Test: start with continue_on_error'
+        uses: ./
+        id: partial
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          desc: 'Continue on error test'
+          env: env-${{ env.ENV_SUFFIX }}-partial
+          auto_inactive: 'true'
+          continue_on_error: 'true'
+          debug: true
+
+      - name: 'Verify: continue_on_error output'
+        run: |
+          test -n "$DEPLOY_ID" || { echo "::error::deployment_id output is empty"; exit 1; }
+        env:
+          DEPLOY_ID: ${{ steps.partial.outputs.deployment_id }}
+
+      - name: 'Test: finish with continue_on_error'
+        uses: ./
+        with:
+          step: finish
+          status: success
+          token: ${{ secrets.GITHUB_TOKEN }}
+          deployment_id: ${{ steps.partial.outputs.deployment_id }}
+          continue_on_error: 'true'
+          debug: true
+
       # ─── Dry-run mode ───────────────────────────────────────────────
       - name: 'Test: dry-run start'
         uses: ./

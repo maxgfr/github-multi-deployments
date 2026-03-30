@@ -60,7 +60,8 @@ export function collectDeploymentContext(): DeploymentContext {
       payload: getInput('payload') || undefined,
       autoInactive: getInput('auto_inactive') === 'true',
       transientEnvironment: getInput('transient_environment') !== 'false',
-      productionEnvironment: getInput('production_environment') === 'true'
+      productionEnvironment: getInput('production_environment') === 'true',
+      continueOnError: getInput('continue_on_error') === 'true'
     }
   }
 }

@@ -75,6 +75,50 @@ describe('collectDeploymentContext', () => {
     )
   })
 
+  it('should handle repository with extra path segments', () => {
+    setupInputs({
+      token: 'test-token',
+      repository: 'my-org/my-repo/extra'
+    })
+
+    const ctx = collectDeploymentContext()
+
+    expect(ctx.owner).toBe('my-org')
+    expect(ctx.repo).toBe('my-repo')
+  })
+
+  it('should throw for repository with trailing slash', () => {
+    setupInputs({token: 'test-token', repository: 'owner/'})
+
+    expect(() => collectDeploymentContext()).toThrow(
+      'invalid target repository'
+    )
+  })
+
+  it('should throw for repository with leading slash', () => {
+    setupInputs({token: 'test-token', repository: '/repo'})
+
+    expect(() => collectDeploymentContext()).toThrow(
+      'invalid target repository'
+    )
+  })
+
+  it('should parse continue_on_error flag', () => {
+    setupInputs({token: 'test-token', continue_on_error: 'true'})
+
+    const ctx = collectDeploymentContext()
+
+    expect(ctx.coreArgs.continueOnError).toBe(true)
+  })
+
+  it('should default continue_on_error to false', () => {
+    setupInputs({token: 'test-token'})
+
+    const ctx = collectDeploymentContext()
+
+    expect(ctx.coreArgs.continueOnError).toBe(false)
+  })
+
   it('should prefer GITHUB_HEAD_REF over GITHUB_REF', () => {
     process.env.GITHUB_HEAD_REF = 'feature-branch'
     process.env.GITHUB_REF = 'refs/heads/main'
