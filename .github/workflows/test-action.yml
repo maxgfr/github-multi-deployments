@@ -150,7 +150,7 @@ jobs:
           production_environment: 'true'
           debug: true
 
-      - name: 'Test: finish (cancelled → inactive mapping)'
+      - name: 'Test: finish (cancelled -> inactive mapping)'
         uses: ./
         with:
           step: finish
@@ -257,15 +257,27 @@ jobs:
           dry_run: 'true'
           debug: true
 
-      # ─── Cleanup ────────────────────────────────────────────────────
-      - name: Cleanup test environments
+      # ─── Cleanup: delete all test environments ──────────────────────
+      - name: Cleanup - delete all test environments
         if: always()
         continue-on-error: true
-        uses: ./
-        with:
-          step: deactivate-env
-          token: ${{ secrets.GITHUB_TOKEN }}
-          env: '["env-${{ env.ENV_SUFFIX }}-single", "env-${{ env.ENV_SUFFIX }}-multiA", "env-${{ env.ENV_SUFFIX }}-multiB", "env-${{ env.ENV_SUFFIX }}-string", "env-${{ env.ENV_SUFFIX }}-features", "env-${{ env.ENV_SUFFIX }}-logurl"]'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ENVS=(
+            "env-${{ env.ENV_SUFFIX }}-single"
+            "env-${{ env.ENV_SUFFIX }}-multiA"
+            "env-${{ env.ENV_SUFFIX }}-multiB"
+            "env-${{ env.ENV_SUFFIX }}-string"
+            "env-${{ env.ENV_SUFFIX }}-features"
+            "env-${{ env.ENV_SUFFIX }}-logurl"
+            "env-${{ env.ENV_SUFFIX }}-partial"
+          )
+          for env in "${ENVS[@]}"; do
+            echo "Deleting environment: $env"
+            gh api -X DELETE "repos/${{ github.repository }}/environments/$env" 2>/dev/null || true
+          done
+          echo "Cleanup complete"
 
   delete-env:
     name: Delete environment (requires PAT)
@@ -308,3 +320,11 @@ jobs:
           token: ${{ secrets.GH_PAT_TOKEN }}
           env: env-${{ github.run_id }}-delete
           debug: true
+
+      - name: Cleanup - delete test environment
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api -X DELETE "repos/${{ github.repository }}/environments/env-${{ github.run_id }}-delete" 2>/dev/null || true
