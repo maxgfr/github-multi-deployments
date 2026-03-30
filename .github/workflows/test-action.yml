@@ -28,68 +28,74 @@ jobs:
       - name: Build and package
         run: pnpm run build && pnpm run package
 
-      - name: Notify deployment start
+      # ─── Basic: single env start + finish ────────────────────────────
+      - name: 'Test: start (single env)'
         uses: ./
+        id: single
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          desc: 'Deploying environment X'
-          env: '["envX"]'
+          desc: 'Single env test'
+          env: envSingle
           debug: true
 
-      - name: Notify deployment deactivation
+      - name: 'Verify: start output'
+        run: |
+          test -n "$DEPLOY_ID" || { echo "::error::deployment_id output is empty"; exit 1; }
+          test -n "$DEPLOY_ENV" || { echo "::error::env output is empty"; exit 1; }
+          echo "$DEPLOY_ID" | python3 -c "import sys,json; json.load(sys.stdin)" || { echo "::error::deployment_id is not valid JSON"; exit 1; }
+        env:
+          DEPLOY_ID: ${{ steps.single.outputs.deployment_id }}
+          DEPLOY_ENV: ${{ steps.single.outputs.env }}
+
+      - name: 'Test: finish (success)'
         uses: ./
+        id: finish-single
         with:
-          step: deactivate-env
+          step: finish
+          status: success
           token: ${{ secrets.GITHUB_TOKEN }}
-          env: '["envX"]'
+          deployment_id: ${{ steps.single.outputs.deployment_id }}
           debug: true
 
-      - name: Notify deployment delete
-        uses: ./
-        with:
-          step: delete-env
-          token: ${{ secrets.GH_PAT_TOKEN }}
-          env: '["envX"]'
-          debug: true
+      - name: 'Verify: finish output'
+        run: |
+          test -n "$DEPLOY_ID" || { echo "::error::finish deployment_id output is empty"; exit 1; }
+          echo "$DEPLOY_ID" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d[0]['status']=='success'" || { echo "::error::finish status mismatch"; exit 1; }
+        env:
+          DEPLOY_ID: ${{ steps.finish-single.outputs.deployment_id }}
 
-      - name: Notify deployment start (multiple)
+      # ─── Multi-env: start + finish with env_url ──────────────────────
+      - name: 'Test: start (multi-env)'
         uses: ./
-        id: deployment2
+        id: multi
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          desc: 'Deploying environment C and environment D'
-          env: '["envC", "envD"]'
+          desc: 'Multi-env test'
+          env: '["envMultiA", "envMultiB"]'
           debug: true
 
-      - name: Notify deployment finish
+      - name: 'Test: finish (multi-env with env_url)'
         uses: ./
         with:
           step: finish
-          status: 'success'
+          status: success
           token: ${{ secrets.GITHUB_TOKEN }}
-          deployment_id: ${{ steps.deployment2.outputs.deployment_id }}
+          deployment_id: ${{ steps.multi.outputs.deployment_id }}
+          env_url: '["https://env-a.example.com", "https://env-b.example.com"]'
           debug: true
 
-      - name: Notify deployment start (single string)
-        uses: ./
-        with:
-          step: start
-          token: ${{ secrets.GITHUB_TOKEN }}
-          desc: 'Deploying environment Z'
-          env: envZ
-          debug: true
-
-      - name: Notify deployment deactivation (single string)
+      # ─── Deactivate + get-env ────────────────────────────────────────
+      - name: 'Test: deactivate-env (array)'
         uses: ./
         with:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
-          env: envZ
+          env: '["envMultiA", "envMultiB"]'
           debug: true
 
-      - name: Notify get env
+      - name: 'Test: get-env'
         uses: ./
         id: envs
         with:
@@ -97,10 +103,179 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           debug: true
 
-      - name: Notify deployment deactivation (dynamic)
+      - name: 'Verify: get-env output'
+        run: |
+          test -n "$ENV_OUTPUT" || { echo "::error::get-env output is empty"; exit 1; }
+          echo "$ENV_OUTPUT" | python3 -c "import sys,json; json.load(sys.stdin)" || { echo "::error::get-env output is not valid JSON"; exit 1; }
+        env:
+          ENV_OUTPUT: ${{ steps.envs.outputs.env }}
+
+      # ─── Single string env ──────────────────────────────────────────
+      - name: 'Test: start (single string env)'
+        uses: ./
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          desc: 'Single string env test'
+          env: envStringZ
+          debug: true
+
+      - name: 'Test: deactivate-env (single string)'
+        uses: ./
+        with:
+          step: deactivate-env
+          token: ${{ secrets.GITHUB_TOKEN }}
+          env: envStringZ
+          debug: true
+
+      # ─── Dynamic deactivation from get-env output ───────────────────
+      - name: 'Test: deactivate-env (dynamic from get-env)'
         uses: ./
         with:
           step: deactivate-env
           token: ${{ secrets.GITHUB_TOKEN }}
           env: ${{ steps.envs.outputs.env }}
+          debug: true
+
+      # ─── New features: payload, auto_inactive, production, transient ─
+      - name: 'Test: start (payload + auto_inactive + production)'
+        uses: ./
+        id: features
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          desc: 'New features test'
+          env: envFeatures
+          payload: '{"version": "2.0.0", "deployer": "ci"}'
+          auto_inactive: 'true'
+          transient_environment: 'false'
+          production_environment: 'true'
+          debug: true
+
+      - name: 'Test: finish (cancelled → inactive mapping)'
+        uses: ./
+        with:
+          step: finish
+          status: cancelled
+          token: ${{ secrets.GITHUB_TOKEN }}
+          deployment_id: ${{ steps.features.outputs.deployment_id }}
+          debug: true
+
+      # ─── Custom log_url ─────────────────────────────────────────────
+      - name: 'Test: start (custom log_url)'
+        uses: ./
+        id: logurl
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          desc: 'Custom log URL test'
+          env: envLogUrl
+          log_url: 'https://my-dashboard.example.com/logs/run-123'
+          debug: true
+
+      - name: 'Test: finish (custom log_url)'
+        uses: ./
+        with:
+          step: finish
+          status: success
+          token: ${{ secrets.GITHUB_TOKEN }}
+          deployment_id: ${{ steps.logurl.outputs.deployment_id }}
+          log_url: 'https://my-dashboard.example.com/logs/run-123'
+          debug: true
+
+      # ─── Dry-run mode ───────────────────────────────────────────────
+      - name: 'Test: dry-run start'
+        uses: ./
+        id: dryrun
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          desc: 'Dry-run test'
+          env: '["envDryA", "envDryB"]'
+          dry_run: 'true'
+          debug: true
+
+      - name: 'Verify: dry-run output contains dry-run IDs'
+        run: |
+          echo "$DEPLOY_ID" | grep -q "dry-run" || { echo "::error::dry-run output missing dry-run IDs"; exit 1; }
+        env:
+          DEPLOY_ID: ${{ steps.dryrun.outputs.deployment_id }}
+
+      - name: 'Test: dry-run finish'
+        uses: ./
+        with:
+          step: finish
+          status: success
+          token: ${{ secrets.GITHUB_TOKEN }}
+          deployment_id: ${{ steps.dryrun.outputs.deployment_id }}
+          dry_run: 'true'
+          debug: true
+
+      - name: 'Test: dry-run deactivate-env'
+        uses: ./
+        with:
+          step: deactivate-env
+          token: ${{ secrets.GITHUB_TOKEN }}
+          env: envDryA
+          dry_run: 'true'
+          debug: true
+
+      - name: 'Test: dry-run delete-env'
+        uses: ./
+        with:
+          step: delete-env
+          token: ${{ secrets.GITHUB_TOKEN }}
+          env: envDryA
+          dry_run: 'true'
+          debug: true
+
+      # ─── Cleanup: deactivate all test environments ──────────────────
+      - name: Cleanup test environments
+        if: always()
+        uses: ./
+        with:
+          step: deactivate-env
+          token: ${{ secrets.GITHUB_TOKEN }}
+          env: '["envSingle", "envMultiA", "envMultiB", "envStringZ", "envFeatures", "envLogUrl"]'
+          debug: true
+
+  delete-env:
+    name: Delete environment (requires PAT)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and package
+        run: pnpm run build && pnpm run package
+
+      - name: Start deployment for delete test
+        uses: ./
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          desc: 'Delete env test'
+          env: envToDelete
+          debug: true
+
+      - name: 'Test: delete-env'
+        uses: ./
+        continue-on-error: true
+        with:
+          step: delete-env
+          token: ${{ secrets.GH_PAT_TOKEN }}
+          env: envToDelete
           debug: true
