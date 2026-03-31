@@ -10,6 +10,9 @@ env:
   # Unique suffix per run to avoid conflicts with historical deployments
   ENV_SUFFIX: ${{ github.run_id }}
 
+permissions:
+  deployments: write
+
 jobs:
   action:
     runs-on: ubuntu-latest
@@ -257,12 +260,23 @@ jobs:
           dry_run: 'true'
           debug: true
 
+      # ─── Delete-env test (using action) ─────────────────────────────
+      - name: 'Test: delete-env (with PAT)'
+        if: github.event_name == 'push'
+        uses: ./
+        continue-on-error: true
+        with:
+          step: delete-env
+          token: ${{ secrets.GH_PAT_TOKEN }}
+          env: env-${{ env.ENV_SUFFIX }}-string
+          debug: true
+
       # ─── Cleanup: delete all test environments ──────────────────────
       - name: Cleanup - delete all test environments
         if: always()
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           ENVS=(
             "env-${{ env.ENV_SUFFIX }}-single"
@@ -273,58 +287,8 @@ jobs:
             "env-${{ env.ENV_SUFFIX }}-logurl"
             "env-${{ env.ENV_SUFFIX }}-partial"
           )
-          for env in "${ENVS[@]}"; do
-            echo "Deleting environment: $env"
-            gh api -X DELETE "repos/${{ github.repository }}/environments/$env" 2>/dev/null || true
+          for env_name in "${ENVS[@]}"; do
+            echo "Deleting environment: $env_name"
+            gh api -X DELETE "repos/${{ github.repository }}/environments/$env_name" 2>&1 || true
           done
           echo "Cleanup complete"
-
-  delete-env:
-    name: Delete environment (requires PAT)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build and package
-        run: pnpm run build && pnpm run package
-
-      - name: Start deployment for delete test
-        uses: ./
-        with:
-          step: start
-          token: ${{ secrets.GITHUB_TOKEN }}
-          desc: 'Delete env test'
-          env: env-${{ github.run_id }}-delete
-          auto_inactive: 'true'
-          debug: true
-
-      - name: 'Test: delete-env'
-        uses: ./
-        continue-on-error: true
-        with:
-          step: delete-env
-          token: ${{ secrets.GH_PAT_TOKEN }}
-          env: env-${{ github.run_id }}-delete
-          debug: true
-
-      - name: Cleanup - delete test environment
-        if: always()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api -X DELETE "repos/${{ github.repository }}/environments/env-${{ github.run_id }}-delete" 2>/dev/null || true
