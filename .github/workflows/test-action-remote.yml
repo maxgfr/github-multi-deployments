@@ -36,7 +36,8 @@ jobs:
       - name: Cleanup - delete environment
         if: always()
         continue-on-error: true
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          gh api -X DELETE "repos/${{ github.repository }}/environments/env-remote-${{ github.run_id }}" 2>&1 || true
+        uses: maxgfr/github-multi-deployments@main
+        with:
+          step: delete-env
+          token: ${{ secrets.GH_PAT_TOKEN }}
+          env: env-remote-${{ github.run_id }}

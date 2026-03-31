@@ -185,7 +185,7 @@ jobs:
           log_url: 'https://my-dashboard.example.com/logs/run-123'
           debug: true
 
-      # ─── Continue on error (multi-env partial failure) ──────────────
+      # ─── Continue on error ──────────────────────────────────────────
       - name: 'Test: start with continue_on_error'
         uses: ./
         id: partial
@@ -260,7 +260,7 @@ jobs:
           dry_run: 'true'
           debug: true
 
-      # ─── Delete-env test (using action) ─────────────────────────────
+      # ─── Delete-env test ────────────────────────────────────────────
       - name: 'Test: delete-env (with PAT)'
         if: github.event_name == 'push'
         uses: ./
@@ -271,24 +271,12 @@ jobs:
           env: env-${{ env.ENV_SUFFIX }}-string
           debug: true
 
-      # ─── Cleanup: delete all test environments ──────────────────────
-      - name: Cleanup - delete all test environments
+      # ─── Cleanup: delete all test environments using the action ─────
+      - name: Cleanup test environments
         if: always()
         continue-on-error: true
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          ENVS=(
-            "env-${{ env.ENV_SUFFIX }}-single"
-            "env-${{ env.ENV_SUFFIX }}-multiA"
-            "env-${{ env.ENV_SUFFIX }}-multiB"
-            "env-${{ env.ENV_SUFFIX }}-string"
-            "env-${{ env.ENV_SUFFIX }}-features"
-            "env-${{ env.ENV_SUFFIX }}-logurl"
-            "env-${{ env.ENV_SUFFIX }}-partial"
-          )
-          for env_name in "${ENVS[@]}"; do
-            echo "Deleting environment: $env_name"
-            gh api -X DELETE "repos/${{ github.repository }}/environments/$env_name" 2>&1 || true
-          done
-          echo "Cleanup complete"
+        uses: ./
+        with:
+          step: delete-env
+          token: ${{ secrets.GH_PAT_TOKEN }}
+          env: '["env-${{ env.ENV_SUFFIX }}-single", "env-${{ env.ENV_SUFFIX }}-multiA", "env-${{ env.ENV_SUFFIX }}-multiB", "env-${{ env.ENV_SUFFIX }}-features", "env-${{ env.ENV_SUFFIX }}-logurl", "env-${{ env.ENV_SUFFIX }}-partial"]'
