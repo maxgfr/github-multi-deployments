@@ -208,4 +208,4 @@ Set `debug: 'true'` to print all arguments and API responses.
 
 ## License
 
-[MIT License](LICENSE)
+[MIT](LICENSE)
