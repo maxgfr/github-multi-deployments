@@ -28,9 +28,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy
-        run: ./deploy.sh
-
       - name: Start deployment
         uses: maxgfr/github-multi-deployments@main
         id: deployment
@@ -40,12 +37,15 @@ jobs:
           env: '["staging", "production"]'
           desc: Deploying v1.2.3
 
+      - name: Deploy
+        run: ./deploy.sh
+
       - name: Finish deployment
         uses: maxgfr/github-multi-deployments@main
         with:
           step: finish
           token: ${{ secrets.GITHUB_TOKEN }}
-          status: success
+          status: ${{ job.status }}
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
           env_url: '["https://staging.example.com", "https://example.com"]'
 ```
@@ -126,6 +126,21 @@ jobs:
     auto_inactive: 'true'
     log_url: https://grafana.example.com/d/deployments
     payload: '{"version": "${{ github.sha }}", "deployer": "${{ github.actor }}"}'
+```
+
+### Discover environments for a ref
+
+```yml
+- name: Get environments
+  uses: maxgfr/github-multi-deployments@main
+  id: envs
+  with:
+    step: get-env
+    token: ${{ secrets.GITHUB_TOKEN }}
+    ref: ${{ github.head_ref }}
+
+- name: Use environments
+  run: echo "Found environments: ${{ steps.envs.outputs.env }}"
 ```
 
 ## Inputs
