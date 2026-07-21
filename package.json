@@ -9,7 +9,7 @@
     "format-check": "prettier --check '**/*.ts'",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
-    "package": "ncc build --source-map --license licenses.txt",
+    "package": "ncc build lib/main.js --source-map --license licenses.txt",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -19,7 +19,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/maxgfr/multi-deployments.git"
+    "url": "git+https://github.com/maxgfr/github-multi-deployments.git"
   },
   "keywords": [
     "actions",
@@ -34,12 +34,12 @@
   },
   "packageManager": "pnpm@10.29.1",
   "dependencies": {
-    "@actions/core": "^1.11.1",
-    "@actions/github": "^6.0.1"
+    "@actions/core": "^2.0.3",
+    "@actions/github": "^7.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "@types/jest": "^30.0.0",
+    "@types/jest": "^29.5.14",
     "@types/node": "^22.19.10",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
@@ -57,5 +57,10 @@
   },
   "lint-staged": {
     "*.ts": "pnpm run format"
+  },
+  "pnpm": {
+    "overrides": {
+      "undici": "^6.27.0"
+    }
   }
 }
