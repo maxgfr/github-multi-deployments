@@ -40,19 +40,52 @@ async function deactivateEnvironment(
   }
 
   const deadState = 'inactive'
+
+  const latestStatuses = await Promise.all(
+    deployments.map(deployment =>
+      withRetry(() =>
+        client.rest.repos.listDeploymentStatuses({
+          owner,
+          repo,
+          deployment_id: deployment.id,
+          per_page: 1
+        })
+      )
+    )
+  )
+
+  const activeDeployments = deployments.filter((deployment, index) => {
+    const latestState = latestStatuses[index].data[0]?.state
+    if (latestState === deadState) {
+      console.log(
+        `deployment '${environment}.${deployment.id}' is already ${deadState} - skipping`
+      )
+      return false
+    }
+    return true
+  })
+
+  const active = activeDeployments.length
+  if (active < 1) {
+    console.log(
+      `found ${existing} existing deployments for env ${environment} - all already ${deadState}`
+    )
+    return {environment, count: 0}
+  }
+
   console.log(
-    `found ${existing} existing deployments for env ${environment} - marking as ${deadState}`
+    `found ${active} active deployments for env ${environment} - marking as ${deadState}`
   )
 
   if (dryRun) {
     console.log(
-      `[dry-run] would deactivate ${existing} deployments for env ${environment}`
+      `[dry-run] would deactivate ${active} deployments for env ${environment}`
     )
-    return {environment, count: existing}
+    return {environment, count: active}
   }
 
   const results = await Promise.allSettled(
-    deployments.map(deployment => {
+    activeDeployments.map(deployment => {
       console.log(
         `setting deployment '${environment}.${deployment.id}' (${deployment.sha}) state to "${deadState}"`
       )
@@ -70,15 +103,15 @@ async function deactivateEnvironment(
   const failures = results.filter(r => r.status === 'rejected')
   if (failures.length > 0) {
     console.log(
-      `${failures.length}/${existing} deployments failed to deactivate for env ${environment}`
+      `${failures.length}/${active} deployments failed to deactivate for env ${environment}`
     )
     throw new Error(
-      `Failed to deactivate ${failures.length}/${existing} deployments for env ${environment}`
+      `Failed to deactivate ${failures.length}/${active} deployments for env ${environment}`
     )
   }
 
-  console.log(`${existing} deployments updated`)
-  return {environment, count: existing}
+  console.log(`${active} deployments updated`)
+  return {environment, count: active}
 }
 
 export default deactivateEnvironment

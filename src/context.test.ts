@@ -21,9 +21,11 @@ jest.mock('@actions/github', () => ({
 }))
 
 import {getInput} from '@actions/core'
+import {getOctokit} from '@actions/github'
 import {collectDeploymentContext} from './context'
 
 const mockGetInput = getInput as jest.Mock
+const mockGetOctokit = getOctokit as jest.Mock
 
 function setupInputs(inputs: Record<string, string>) {
   mockGetInput.mockImplementation(
@@ -53,6 +55,15 @@ describe('collectDeploymentContext', () => {
     expect(ctx.repo).toBe('default-repo')
     expect(ctx.sha).toBe('test-sha-123')
     expect(ctx.ref).toBe('refs/heads/main')
+  })
+
+  it('should create the octokit client without deprecated preview options', () => {
+    setupInputs({token: 'test-token'})
+
+    collectDeploymentContext()
+
+    expect(mockGetOctokit).toHaveBeenCalledTimes(1)
+    expect(mockGetOctokit).toHaveBeenCalledWith('test-token')
   })
 
   it('should use custom repository when provided', () => {

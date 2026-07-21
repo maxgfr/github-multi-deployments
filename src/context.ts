@@ -40,9 +40,7 @@ export function collectDeploymentContext(): DeploymentContext {
     throw new Error(`invalid target repository: ${owner}/${repo}`)
   }
 
-  const github = getOctokit(getInput('token', {required: true}), {
-    previews: ['ant-man-preview', 'flash-preview']
-  })
+  const github = getOctokit(getInput('token', {required: true}))
 
   return {
     ref: process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF || '',

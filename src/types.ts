@@ -31,17 +31,23 @@ export interface DeploymentData {
 }
 
 /**
- * Valid deployment status values according to GitHub API
+ * Deployment status values supported by the GitHub deployment status API
  */
-export type DeploymentStatus =
+export type GitHubApiDeploymentStatus =
   | 'success'
   | 'failure'
-  | 'cancelled'
   | 'error'
   | 'inactive'
   | 'in_progress'
   | 'queued'
   | 'pending'
+
+/**
+ * Status values accepted as input by this action.
+ * 'cancelled' is not a GitHub API status: it is accepted for backward
+ * compatibility and mapped to 'inactive' before calling the API.
+ */
+export type DeploymentStatus = GitHubApiDeploymentStatus | 'cancelled'
 
 /**
  * Core arguments shared across all steps
@@ -119,4 +125,15 @@ export function isValidDeploymentStatus(
     'queued',
     'pending'
   ].includes(status)
+}
+
+/**
+ * Maps an accepted input status to a status supported by the GitHub API.
+ * 'cancelled' is kept for backward compatibility and mapped to 'inactive';
+ * every other accepted status is already a valid API status.
+ */
+export function toApiDeploymentStatus(
+  status: DeploymentStatus
+): GitHubApiDeploymentStatus {
+  return status === 'cancelled' ? 'inactive' : status
 }

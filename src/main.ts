@@ -7,25 +7,22 @@ import {Step, run} from './steps'
  * Collects deployment context and executes the requested step.
  */
 async function main(): Promise<void> {
-  try {
-    const context = collectDeploymentContext()
-    console.log(`targeting ${context.owner}/${context.repo}`)
+  const context = collectDeploymentContext()
+  console.log(`targeting ${context.owner}/${context.repo}`)
 
-    const stepInput = core.getInput('step', {required: true})
-    const validSteps = Object.values(Step) as string[]
+  const stepInput = core.getInput('step', {required: true})
+  const validSteps = Object.values(Step) as string[]
 
-    if (!validSteps.includes(stepInput)) {
-      core.setFailed(
-        `Invalid step "${stepInput}". Must be one of: ${validSteps.join(', ')}`
-      )
-      return
-    }
-
-    await run(stepInput as Step, context)
-  } catch (error) {
-    core.setFailed(`Action failed: ${error}`)
-    throw error
+  if (!validSteps.includes(stepInput)) {
+    core.setFailed(
+      `Invalid step "${stepInput}". Must be one of: ${validSteps.join(', ')}`
+    )
+    return
   }
+
+  await run(stepInput as Step, context)
 }
 
-main()
+main().catch(error => {
+  core.setFailed(`Action failed: ${error}`)
+})

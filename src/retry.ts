@@ -2,12 +2,29 @@ export interface RetryOptions {
   maxRetries: number
   baseDelayMs: number
   maxDelayMs: number
+  isRetryable: (err: unknown) => boolean
+}
+
+/**
+ * Determines whether an error is worth retrying.
+ * Retries rate limiting (429), server errors (5xx) and network errors
+ * (no HTTP status). Client errors such as 401/403/404/422 are not retried.
+ */
+export function isRetryableError(err: unknown): boolean {
+  if (err && typeof err === 'object' && 'status' in err) {
+    const status = (err as {status: unknown}).status
+    if (typeof status === 'number') {
+      return status === 429 || status >= 500
+    }
+  }
+  return true
 }
 
 const DEFAULT_OPTIONS: RetryOptions = {
   maxRetries: 3,
   baseDelayMs: 1000,
-  maxDelayMs: 10000
+  maxDelayMs: 10000,
+  isRetryable: isRetryableError
 }
 
 export async function withRetry<T>(
@@ -22,6 +39,9 @@ export async function withRetry<T>(
       return await fn()
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
+      if (!opts.isRetryable(err)) {
+        throw lastError
+      }
       if (attempt < opts.maxRetries) {
         const delay = Math.min(
           opts.baseDelayMs * Math.pow(2, attempt),

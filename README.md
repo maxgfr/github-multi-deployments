@@ -8,7 +8,7 @@ This action is a fork of [`bobheadxi/deployments`](https://github.com/marketplac
 
 - Multi-environment support (deploy to N environments in one step)
 - Pagination for environments with many deployments
-- Retry with exponential backoff on API failures
+- Retry with exponential backoff on transient API failures (429, 5xx, network errors); deployment creation is never retried to avoid duplicates
 - Dry-run mode for testing workflows
 - Configurable transient/production environment flags
 - Custom log URLs, payload metadata, and env URL validation
@@ -154,8 +154,8 @@ ref|string|no|Git ref for the deploy. Defaults to `GITHUB_HEAD_REF` or `GITHUB_R
 repository|string|no|Target a different repository (`owner/repo`). Defaults to the current repository.
 env|string or string[]|no|Environment name(s). JSON array `'["a","b"]'` or single string `'a'`. Required for `start`, `deactivate-env`, `delete-env`.
 deployment_id|string or string[]|no|Deployment ID(s) to update. Required for `finish`.
-env_url|string or string[]|no|Environment URL(s) to set on success. Must be valid HTTP(S) URLs. For `finish` only.
-status|string|no|Deployment status: `success`, `failure`, `cancelled`, `error`, `inactive`, `in_progress`, `queued`, `pending`. For `finish` only.
+env_url|string or string[]|no|Environment URL(s) to set on the deployment status. Must be valid HTTP(S) URLs. For `finish` only.
+status|string|no|Deployment status: `success`, `failure`, `cancelled`, `error`, `inactive`, `in_progress`, `queued`, `pending`. `cancelled` is not a GitHub API status: it is accepted for backward compatibility and mapped to `inactive`. For `finish` only.
 payload|string|no|JSON metadata attached to the deployment. For `start` only.
 auto_inactive|boolean|no|Let GitHub auto-deactivate previous deployments (skips manual deactivation). For `start` only. Default: `false`.
 log_url|string|no|Custom log URL. Defaults to the commit checks page.
@@ -169,8 +169,8 @@ debug|boolean|no|Print detailed arguments and API responses. Default: `false`.
 
 **Name**|**Type**|**Step**|**Description**
 -----|-----|-----|-----
-deployment_id|string|start|JSON array of deployment objects with IDs and environment information
-deployment_id|string|finish|JSON array of objects with deployment IDs and final statuses
+deployment_id|string|start|JSON array of deployment objects with IDs, an `environment` field and a `status` field (`in_progress`, or `unknown` when the status creation failed with `continue_on_error`)
+deployment_id|string|finish|JSON array of objects with deployment IDs and final statuses. With `continue_on_error`, deployments whose status update failed are reported with status `unknown`.
 env|string|start|The original environment input value
 env|string|get-env|JSON array of environment names for the specified ref
 

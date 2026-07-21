@@ -35,7 +35,7 @@ inputs:
     description: The environment URL. It could be an array of string. (For `finish` only)
   status:
     required: false
-    description: The deployment status. (For `finish` only)
+    description: "The deployment status: success, failure, cancelled, error, inactive, in_progress, queued, pending. Note: 'cancelled' is not a GitHub API status; it is accepted for backward compatibility and mapped to 'inactive'. (For `finish` only)"
   payload:
     required: false
     description: JSON payload with extra information about the deployment. (For `start` only)

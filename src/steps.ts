@@ -13,9 +13,11 @@ import {isValidUrl} from './url'
 import {withRetry} from './retry'
 import {
   isValidDeploymentStatus,
+  toApiDeploymentStatus,
   type CreateDeploymentResponse,
   type DeploymentData,
   type DeploymentStatus,
+  type GitHubApiDeploymentStatus,
   type FinishStepArgs,
   type GetEnvStepArgs,
   type StartStepArgs,
@@ -171,7 +173,7 @@ export async function run(
           )
           const mockOutput = environments.map((env, i) => ({
             id: `dry-run-${i}`,
-            deployment_url: env
+            environment: env
           }))
           setOutput('deployment_id', JSON.stringify(mockOutput))
           setOutput('env', args.environment)
@@ -200,33 +202,41 @@ export async function run(
           )
         }
 
-        // Create new deployments
+        // Create new deployments.
+        // createDeployment is not idempotent, so it is intentionally not retried:
+        // a timeout after a server-side success would create duplicate deployments.
         const deploymentResults = await Promise.allSettled(
           environments.map(env =>
-            withRetry(() =>
-              github.rest.repos.createDeployment({
-                owner: context.owner,
-                repo: context.repo,
-                ref: args.gitRef,
-                required_contexts: [],
-                environment: env,
-                auto_merge: false,
-                description: args.desc,
-                transient_environment: args.transientEnvironment,
-                production_environment: args.productionEnvironment,
-                payload: args.payload || '',
-                ...(args.autoInactive && {auto_inactive: true})
-              })
-            )
+            github.rest.repos.createDeployment({
+              owner: context.owner,
+              repo: context.repo,
+              ref: args.gitRef,
+              required_contexts: [],
+              environment: env,
+              auto_merge: false,
+              description: args.desc,
+              transient_environment: args.transientEnvironment,
+              production_environment: args.productionEnvironment,
+              payload: args.payload || '',
+              ...(args.autoInactive && {auto_inactive: true})
+            })
           )
         )
 
-        const deploymentsData: CreateDeploymentResponse[] = []
+        // Pair each created deployment with its environment by index so that
+        // duplicate environment names cannot misalign the mapping
+        const createdDeployments: {
+          env: string
+          deployment: CreateDeploymentResponse
+        }[] = []
         const failedEnvs: string[] = []
 
         deploymentResults.forEach((result, index) => {
           if (result.status === 'fulfilled') {
-            deploymentsData.push(result.value as CreateDeploymentResponse)
+            createdDeployments.push({
+              env: environments[index],
+              deployment: result.value as CreateDeploymentResponse
+            })
           } else {
             failedEnvs.push(environments[index])
             error(
@@ -236,7 +246,7 @@ export async function run(
         })
 
         if (failedEnvs.length > 0) {
-          if (args.continueOnError && deploymentsData.length > 0) {
+          if (args.continueOnError && createdDeployments.length > 0) {
             warning(
               `Partial failure: could not create deployments for: ${failedEnvs.join(', ')}`
             )
@@ -249,12 +259,12 @@ export async function run(
 
         if (args.isDebug) {
           console.log('Deployments data')
-          console.log(deploymentsData)
+          console.log(createdDeployments)
         }
 
         // Create deployment status for each deployment
         const statusResults = await Promise.allSettled(
-          deploymentsData.map(deployment =>
+          createdDeployments.map(({deployment}) =>
             withRetry(() =>
               github.rest.repos.createDeploymentStatus({
                 owner: context.owner,
@@ -274,20 +284,18 @@ export async function run(
           !args.continueOnError
         )
 
-        // Map successful deployments back to their environment names
-        const successfulEnvs = environments.filter(
-          env => !failedEnvs.includes(env)
+        const startedDeployments = createdDeployments.map(
+          ({env, deployment}, index) => ({
+            ...deployment.data,
+            environment: env,
+            status:
+              statusResults[index].status === 'fulfilled'
+                ? 'in_progress'
+                : 'unknown'
+          })
         )
 
-        setOutput(
-          'deployment_id',
-          JSON.stringify(
-            deploymentsData.map((deployment, index) => ({
-              ...deployment.data,
-              deployment_url: successfulEnvs[index]
-            }))
-          )
-        )
+        setOutput('deployment_id', JSON.stringify(startedDeployments))
         setOutput('env', args.environment)
         await summary
           .addHeading('Deployment Started', 3)
@@ -295,12 +303,14 @@ export async function run(
             [
               {data: 'Environment', header: true},
               {data: 'ID', header: true},
-              {data: 'Ref', header: true}
+              {data: 'Ref', header: true},
+              {data: 'Status', header: true}
             ],
-            ...deploymentsData.map((d, i) => [
-              successfulEnvs[i],
-              String(d.data.id),
-              args.gitRef
+            ...startedDeployments.map(d => [
+              d.environment,
+              String(d.id),
+              args.gitRef,
+              d.status
             ])
           ])
           .write()
@@ -347,8 +357,11 @@ export async function run(
           )
         }
 
-        const newStatus: DeploymentStatus =
-          args.status === 'cancelled' ? 'inactive' : args.status
+        // 'cancelled' is accepted for backward compatibility but is not a
+        // GitHub API status: it is mapped to 'inactive' before calling the API
+        const newStatus: GitHubApiDeploymentStatus = toApiDeploymentStatus(
+          args.status
+        )
 
         const deployments = parseDeploymentIds(args.deployment)
 
@@ -382,6 +395,16 @@ export async function run(
           break
         }
 
+        const invalidIds = deployments
+          .map(dep => dep.id)
+          .filter(id => !/^\d+$/.test(id))
+        if (invalidIds.length > 0) {
+          error(`Invalid deployment id(s): ${invalidIds.join(', ')}`)
+          throw new Error(
+            `Invalid deployment id(s): ${invalidIds.join(', ')}. Deployment ids must be numeric.`
+          )
+        }
+
         const results = await Promise.allSettled(
           deployments.map((dep, i) =>
             withRetry(() =>
@@ -391,12 +414,11 @@ export async function run(
                 deployment_id: parseInt(dep.id, 10),
                 state: newStatus,
                 description: args.desc,
-                environment_url:
-                  newStatus === 'success' && environmentsUrl
-                    ? environmentsUrl[i]
-                    : newStatus === 'success' && isValidUrl(dep.deployment_url)
-                      ? dep.deployment_url
-                      : '',
+                environment_url: environmentsUrl
+                  ? environmentsUrl[i]
+                  : isValidUrl(dep.deployment_url)
+                    ? dep.deployment_url
+                    : '',
                 log_url: args.logsURL
               })
             )
@@ -409,12 +431,14 @@ export async function run(
           !args.continueOnError
         )
 
-        setOutput(
-          'deployment_id',
-          JSON.stringify(
-            deployments.map(dep => ({id: dep.id, status: newStatus}))
-          )
-        )
+        // Only report the target status for deployments whose update
+        // actually succeeded; failed updates are reported as 'unknown'
+        const finishedDeployments = deployments.map((dep, i) => ({
+          id: dep.id,
+          status: results[i].status === 'fulfilled' ? newStatus : 'unknown'
+        }))
+
+        setOutput('deployment_id', JSON.stringify(finishedDeployments))
         await summary
           .addHeading(`Deployment Finished (${newStatus})`, 3)
           .addTable([
@@ -423,9 +447,9 @@ export async function run(
               {data: 'Status', header: true},
               {data: 'URL', header: true}
             ],
-            ...deployments.map((dep, i) => [
+            ...finishedDeployments.map((dep, i) => [
               dep.id,
-              newStatus,
+              dep.status,
               environmentsUrl?.[i] || '-'
             ])
           ])

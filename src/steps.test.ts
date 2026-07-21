@@ -35,11 +35,13 @@ import {getInput, setOutput, setFailed} from '@actions/core'
 import {Step, run, parseArrayOrString, parseDeploymentIds} from './steps'
 import deactivateEnvironment from './deactivate'
 import getEnvByRef from './get-env'
+import {withRetry} from './retry'
 import type {DeploymentContext} from './context'
 
 const mockGetInput = getInput as jest.Mock
 const mockSetOutput = setOutput as jest.Mock
 const mockSetFailed = setFailed as jest.Mock
+const mockWithRetry = withRetry as jest.Mock
 
 function mockInputs(inputs: Record<string, string>) {
   mockGetInput.mockImplementation(
@@ -557,6 +559,108 @@ describe('steps', () => {
 
       expect(mockSetFailed).toHaveBeenCalled()
     })
+
+    it('should output environment names instead of a fake deployment_url', async () => {
+      const mockGithub = createMockGithub()
+      const context = createMockContext({github: mockGithub})
+      mockInputs({env: 'staging', ref: 'main'})
+
+      await run(Step.Start, context)
+
+      const outputCall = mockSetOutput.mock.calls.find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (call: any[]) => call[0] === 'deployment_id'
+      )
+      expect(outputCall).toBeDefined()
+      const output = JSON.parse(outputCall![1])
+      expect(output).toHaveLength(1)
+      expect(output[0].id).toBe(1)
+      expect(output[0].environment).toBe('staging')
+      expect(output[0].status).toBe('in_progress')
+      expect(output[0].deployment_url).toBeUndefined()
+    })
+
+    it('should keep env/deployment pairs aligned with duplicate env names on partial failure', async () => {
+      const mockGithub = createMockGithub()
+      let callCount = 0
+      mockGithub.rest.repos.createDeployment.mockImplementation(async () => {
+        callCount++
+        if (callCount === 1) throw new Error('first staging failed')
+        return {
+          data: {id: callCount, sha: 'abc', ref: 'main', environment: 'staging'}
+        }
+      })
+      const context = createMockContext({
+        github: mockGithub,
+        coreArgs: {continueOnError: true}
+      })
+      mockInputs({env: '["staging", "staging"]', ref: 'main'})
+
+      await run(Step.Start, context)
+
+      expect(mockSetFailed).not.toHaveBeenCalled()
+      const outputCall = mockSetOutput.mock.calls.find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (call: any[]) => call[0] === 'deployment_id'
+      )
+      const output = JSON.parse(outputCall![1])
+      expect(output).toEqual([
+        expect.objectContaining({
+          id: 2,
+          environment: 'staging',
+          status: 'in_progress'
+        })
+      ])
+    })
+
+    it('should not report in_progress for deployments whose status creation failed with continueOnError', async () => {
+      const mockGithub = createMockGithub()
+      let id = 0
+      mockGithub.rest.repos.createDeployment.mockImplementation(async () => ({
+        data: {id: ++id, sha: 'abc123', ref: 'main', environment: 'test'}
+      }))
+      mockGithub.rest.repos.createDeploymentStatus
+        .mockRejectedValueOnce(new Error('status failed'))
+        .mockResolvedValueOnce({})
+      const context = createMockContext({
+        github: mockGithub,
+        coreArgs: {continueOnError: true}
+      })
+      mockInputs({env: '["envA", "envB"]', ref: 'main'})
+
+      await run(Step.Start, context)
+
+      expect(mockSetFailed).not.toHaveBeenCalled()
+      const outputCall = mockSetOutput.mock.calls.find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (call: any[]) => call[0] === 'deployment_id'
+      )
+      const output = JSON.parse(outputCall![1])
+      expect(output).toEqual([
+        expect.objectContaining({
+          id: 1,
+          environment: 'envA',
+          status: 'unknown'
+        }),
+        expect.objectContaining({
+          id: 2,
+          environment: 'envB',
+          status: 'in_progress'
+        })
+      ])
+    })
+
+    it('should not wrap createDeployment in withRetry', async () => {
+      const mockGithub = createMockGithub()
+      const context = createMockContext({github: mockGithub})
+      mockInputs({env: 'staging', ref: 'main'})
+
+      await run(Step.Start, context)
+
+      expect(mockGithub.rest.repos.createDeployment).toHaveBeenCalledTimes(1)
+      // withRetry is only used for the (idempotent) status creation
+      expect(mockWithRetry).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('run - Finish step', () => {
@@ -654,6 +758,38 @@ describe('steps', () => {
       )
     })
 
+    it('should accept non-numeric dry-run ids in dry-run mode', async () => {
+      const mockGithub = createMockGithub()
+      const context = createMockContext({
+        github: mockGithub,
+        coreArgs: {dryRun: true}
+      })
+
+      mockInputs({
+        status: 'success',
+        deployment_id: JSON.stringify([
+          {id: 'dry-run-0', environment: 'staging'},
+          {id: 'dry-run-1', environment: 'production'}
+        ])
+      })
+
+      await run(Step.Finish, context)
+
+      expect(mockSetFailed).not.toHaveBeenCalled()
+      expect(
+        mockGithub.rest.repos.createDeploymentStatus
+      ).not.toHaveBeenCalled()
+      const outputCall = mockSetOutput.mock.calls.find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (call: any[]) => call[0] === 'deployment_id'
+      )
+      expect(outputCall).toBeDefined()
+      expect(JSON.parse(outputCall![1])).toEqual([
+        {id: 'dry-run-0', status: 'success'},
+        {id: 'dry-run-1', status: 'success'}
+      ])
+    })
+
     it('should set output with deployment statuses', async () => {
       const mockGithub = createMockGithub()
       const context = createMockContext({github: mockGithub})
@@ -718,7 +854,7 @@ describe('steps', () => {
       )
     })
 
-    it('should not set environment_url for non-success status', async () => {
+    it('should set environment_url for non-success status when provided', async () => {
       const mockGithub = createMockGithub()
       const context = createMockContext({github: mockGithub})
 
@@ -727,6 +863,45 @@ describe('steps', () => {
         deployment_id: JSON.stringify([
           {id: '1', deployment_url: 'https://example.com'}
         ])
+      })
+
+      await run(Step.Finish, context)
+
+      expect(mockGithub.rest.repos.createDeploymentStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: 'failure',
+          environment_url: 'https://example.com'
+        })
+      )
+    })
+
+    it('should set environment_url for in_progress status when env_url is provided', async () => {
+      const mockGithub = createMockGithub()
+      const context = createMockContext({github: mockGithub})
+
+      mockInputs({
+        status: 'in_progress',
+        deployment_id: '1',
+        env_url: 'https://preview.example.com'
+      })
+
+      await run(Step.Finish, context)
+
+      expect(mockGithub.rest.repos.createDeploymentStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: 'in_progress',
+          environment_url: 'https://preview.example.com'
+        })
+      )
+    })
+
+    it('should send empty environment_url when no URL is provided', async () => {
+      const mockGithub = createMockGithub()
+      const context = createMockContext({github: mockGithub})
+
+      mockInputs({
+        status: 'failure',
+        deployment_id: JSON.stringify([{id: '1', deployment_url: ''}])
       })
 
       await run(Step.Finish, context)
@@ -791,6 +966,79 @@ describe('steps', () => {
 
       // Should NOT fail - continueOnError turns errors into warnings
       expect(mockSetFailed).not.toHaveBeenCalled()
+    })
+
+    it('should reject non-numeric deployment ids', async () => {
+      const mockGithub = createMockGithub()
+      const context = createMockContext({github: mockGithub})
+
+      mockInputs({
+        status: 'success',
+        deployment_id: '"abc"'
+      })
+
+      await run(Step.Finish, context)
+
+      expect(
+        mockGithub.rest.repos.createDeploymentStatus
+      ).not.toHaveBeenCalled()
+      expect(mockSetFailed).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid deployment id(s): abc')
+      )
+    })
+
+    it('should reject partially numeric deployment ids in arrays', async () => {
+      const mockGithub = createMockGithub()
+      const context = createMockContext({github: mockGithub})
+
+      mockInputs({
+        status: 'success',
+        deployment_id: JSON.stringify([
+          {id: '1', deployment_url: ''},
+          {id: '12x', deployment_url: ''}
+        ])
+      })
+
+      await run(Step.Finish, context)
+
+      expect(
+        mockGithub.rest.repos.createDeploymentStatus
+      ).not.toHaveBeenCalled()
+      expect(mockSetFailed).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid deployment id(s): 12x')
+      )
+    })
+
+    it('should report unknown status for deployments whose update failed with continueOnError', async () => {
+      const mockGithub = createMockGithub()
+      mockGithub.rest.repos.createDeploymentStatus
+        .mockRejectedValueOnce(new Error('API error'))
+        .mockResolvedValueOnce({})
+      const context = createMockContext({
+        github: mockGithub,
+        coreArgs: {continueOnError: true}
+      })
+
+      mockInputs({
+        status: 'success',
+        deployment_id: JSON.stringify([
+          {id: '1', deployment_url: ''},
+          {id: '2', deployment_url: ''}
+        ])
+      })
+
+      await run(Step.Finish, context)
+
+      expect(mockSetFailed).not.toHaveBeenCalled()
+      const outputCall = mockSetOutput.mock.calls.find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (call: any[]) => call[0] === 'deployment_id'
+      )
+      const output = JSON.parse(outputCall![1])
+      expect(output).toEqual([
+        {id: '1', status: 'unknown'},
+        {id: '2', status: 'success'}
+      ])
     })
 
     it('should write job summary with status and URLs', async () => {

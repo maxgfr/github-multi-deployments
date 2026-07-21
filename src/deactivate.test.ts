@@ -21,6 +21,7 @@ function createMockContext(
       rest: {
         repos: {
           listDeployments: jest.fn(),
+          listDeploymentStatuses: jest.fn().mockResolvedValue({data: []}),
           createDeploymentStatus: jest.fn().mockResolvedValue({})
         }
       },
@@ -148,5 +149,119 @@ describe('deactivateEnvironment', () => {
     expect(
       context.github.rest.repos.createDeploymentStatus
     ).toHaveBeenCalledTimes(1)
+  })
+
+  it('should check the latest status of each deployment', async () => {
+    const context = createMockContext()
+    ;(context.github.paginate as unknown as jest.Mock).mockResolvedValue([
+      {id: 1, sha: 'sha1'},
+      {id: 2, sha: 'sha2'}
+    ])
+
+    await deactivateEnvironment(context, 'staging')
+
+    expect(
+      context.github.rest.repos.listDeploymentStatuses
+    ).toHaveBeenCalledTimes(2)
+    expect(
+      context.github.rest.repos.listDeploymentStatuses
+    ).toHaveBeenCalledWith({
+      owner: 'test-owner',
+      repo: 'test-repo',
+      deployment_id: 1,
+      per_page: 1
+    })
+    expect(
+      context.github.rest.repos.listDeploymentStatuses
+    ).toHaveBeenCalledWith({
+      owner: 'test-owner',
+      repo: 'test-repo',
+      deployment_id: 2,
+      per_page: 1
+    })
+  })
+
+  it('should skip deployments that are already inactive', async () => {
+    const context = createMockContext()
+    ;(context.github.paginate as unknown as jest.Mock).mockResolvedValue([
+      {id: 1, sha: 'sha1'},
+      {id: 2, sha: 'sha2'}
+    ])
+    ;(context.github.rest.repos.listDeploymentStatuses as unknown as jest.Mock)
+      .mockResolvedValueOnce({data: [{state: 'inactive'}]})
+      .mockResolvedValueOnce({data: [{state: 'success'}]})
+
+    const result = await deactivateEnvironment(context, 'staging')
+
+    expect(result).toEqual({environment: 'staging', count: 1})
+    expect(
+      context.github.rest.repos.createDeploymentStatus
+    ).toHaveBeenCalledTimes(1)
+    expect(
+      context.github.rest.repos.createDeploymentStatus
+    ).toHaveBeenCalledWith({
+      owner: 'test-owner',
+      repo: 'test-repo',
+      deployment_id: 2,
+      state: 'inactive'
+    })
+  })
+
+  it('should return count 0 when all deployments are already inactive', async () => {
+    const context = createMockContext()
+    ;(context.github.paginate as unknown as jest.Mock).mockResolvedValue([
+      {id: 1, sha: 'sha1'},
+      {id: 2, sha: 'sha2'}
+    ])
+    ;(
+      context.github.rest.repos.listDeploymentStatuses as unknown as jest.Mock
+    ).mockResolvedValue({data: [{state: 'inactive'}]})
+
+    const result = await deactivateEnvironment(context, 'staging')
+
+    expect(result).toEqual({environment: 'staging', count: 0})
+    expect(
+      context.github.rest.repos.createDeploymentStatus
+    ).not.toHaveBeenCalled()
+  })
+
+  it('should treat deployments without statuses as active', async () => {
+    const context = createMockContext()
+    ;(context.github.paginate as unknown as jest.Mock).mockResolvedValue([
+      {id: 7, sha: 'sha7'}
+    ])
+    ;(
+      context.github.rest.repos.listDeploymentStatuses as unknown as jest.Mock
+    ).mockResolvedValue({data: []})
+
+    const result = await deactivateEnvironment(context, 'staging')
+
+    expect(result).toEqual({environment: 'staging', count: 1})
+    expect(
+      context.github.rest.repos.createDeploymentStatus
+    ).toHaveBeenCalledWith({
+      owner: 'test-owner',
+      repo: 'test-repo',
+      deployment_id: 7,
+      state: 'inactive'
+    })
+  })
+
+  it('should only count active deployments in dry-run mode', async () => {
+    const context = createMockContext({dryRun: true})
+    ;(context.github.paginate as unknown as jest.Mock).mockResolvedValue([
+      {id: 1, sha: 'sha1'},
+      {id: 2, sha: 'sha2'}
+    ])
+    ;(context.github.rest.repos.listDeploymentStatuses as unknown as jest.Mock)
+      .mockResolvedValueOnce({data: [{state: 'inactive'}]})
+      .mockResolvedValueOnce({data: [{state: 'in_progress'}]})
+
+    const result = await deactivateEnvironment(context, 'staging')
+
+    expect(result).toEqual({environment: 'staging', count: 1})
+    expect(
+      context.github.rest.repos.createDeploymentStatus
+    ).not.toHaveBeenCalled()
   })
 })

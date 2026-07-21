@@ -6,7 +6,7 @@ import type {
   GitHubDeployment,
   DeploymentWithUrl
 } from './types'
-import {isValidDeploymentStatus} from './types'
+import {isValidDeploymentStatus, toApiDeploymentStatus} from './types'
 
 describe('types', () => {
   describe('isValidDeploymentStatus', () => {
@@ -32,6 +32,28 @@ describe('types', () => {
       expect(isValidDeploymentStatus('')).toBe(false)
       expect(isValidDeploymentStatus('SUCCESS')).toBe(false)
       expect(isValidDeploymentStatus('running')).toBe(false)
+    })
+  })
+
+  describe('toApiDeploymentStatus', () => {
+    it('should map cancelled to inactive for backward compatibility', () => {
+      expect(toApiDeploymentStatus('cancelled')).toBe('inactive')
+    })
+
+    it('should pass through statuses supported by the GitHub API', () => {
+      const apiStatuses: DeploymentStatus[] = [
+        'success',
+        'failure',
+        'error',
+        'inactive',
+        'in_progress',
+        'queued',
+        'pending'
+      ]
+
+      apiStatuses.forEach(status => {
+        expect(toApiDeploymentStatus(status)).toBe(status)
+      })
     })
   })
 
