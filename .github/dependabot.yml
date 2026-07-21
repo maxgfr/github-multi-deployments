@@ -5,6 +5,13 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # @actions/core 3.x and @actions/github 8+ are ESM-only and incompatible
+      # with this CommonJS + ncc bundle.
+      - dependency-name: '@actions/core'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@actions/github'
+        update-types: ['version-update:semver-major']
     groups:
       minor-and-patch:
         update-types:
